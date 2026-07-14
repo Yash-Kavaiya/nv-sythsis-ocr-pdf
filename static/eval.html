@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Lab · Synthetic OCR PDF Studio</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><rect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%2376b900%22/><text x=%228%22 y=%2212%22 font-size=%2210%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22>N</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="logo"><span class="nv">&#9646;</span> Synthetic OCR PDF Studio</div>
+    <nav>
+      <a href="/">Studio</a>
+      <a href="/eval.html" class="active">Eval Lab</a>
+    </nav>
+    <div class="health" id="health">
+      <span><span class="dot" id="llm-dot"></span><span id="llm-label">LLM: checking&hellip;</span></span>
+      <span><span class="dot on"></span><span id="pdf-label">PDF: &hellip;</span></span>
+    </div>
+  </header>
+
+  <main>
+    <h1>Evaluate your OCR model</h1>
+    <p class="subtitle">
+      Bring your own model (any OpenAI-compatible vision endpoint) or upload its predictions.
+      We score it against the generated JSON ground truth and PDF structure.
+    </p>
+
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <h2>Evaluation setup</h2>
+
+          <label for="run-select">Dataset run</label>
+          <select id="run-select"></select>
+          <div class="hint">Generate documents in the <a href="/">Studio</a> first.</div>
+
+          <label>Prediction source</label>
+          <div class="radio-row">
+            <label><input type="radio" name="mode" value="model" checked>Call my model</label>
+            <label><input type="radio" name="mode" value="upload">Upload predictions</label>
+          </div>
+
+          <div id="model-fields">
+            <label for="base-url">Base URL (OpenAI-compatible)</label>
+            <input type="text" id="base-url" placeholder="https://integrate.api.nvidia.com/v1">
+            <label for="api-key">API key</label>
+            <input type="password" id="api-key" placeholder="nvapi-… (sent server-side only for this eval)">
+            <label for="model-name">Model</label>
+            <input type="text" id="model-name" placeholder="e.g. meta/llama-3.2-90b-vision-instruct">
+            <div class="hint">Each document's rendered page image is sent to your endpoint with a
+              JSON-extraction prompt; the reply is parsed and scored.</div>
+          </div>
+
+          <div id="upload-fields" style="display:none">
+            <label for="predictions">Predictions JSON</label>
+            <textarea id="predictions" style="min-height:140px"
+              placeholder='{"0": {"vendor_name": "…", "total": 81.4}, "1": {…}}'></textarea>
+            <div class="hint">An object keyed by document index; values are your model&rsquo;s extracted JSON.</div>
+          </div>
+
+          <button class="block" id="eval-btn">Run evaluation</button>
+          <div id="eval-error"></div>
+        </div>
+
+        <div class="card">
+          <h2>Past evaluations</h2>
+          <div id="evals-list" class="empty">No evaluations yet.</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" id="dash" style="display:none">
+          <h2>Results <span class="badge" id="eval-id-badge"></span></h2>
+          <div class="tiles" id="tiles"></div>
+
+          <h2 style="margin-top:22px">Exact field accuracy by document</h2>
+          <div class="chart" id="chart"></div>
+
+          <h2 style="margin-top:22px">Per-document detail</h2>
+          <div id="doc-table"></div>
+        </div>
+        <div class="card" id="dash-empty">
+          <div class="empty">Run an evaluation to see the accuracy dashboard.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <dialog class="viewer" id="viewer">
+    <div class="viewer-head">
+      <strong id="viewer-title"></strong>
+      <div class="tabs" id="viewer-tabs"></div>
+      <button class="close" onclick="document.getElementById('viewer').close()">&times;</button>
+    </div>
+    <div class="viewer-body" id="viewer-body"></div>
+  </dialog>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/eval.js"></script>
+</body>
+</html>

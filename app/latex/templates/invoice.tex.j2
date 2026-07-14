@@ -1,0 +1,46 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{array,booktabs,xcolor}
+\renewcommand{\familydefault}{\sfdefault}
+\setlength{\parindent}{0pt}
+\begin{document}
+
+{\Huge\bfseries INVOICE}\hfill{\large \VAR{invoice_number}}
+
+\vspace{4mm}\hrule\vspace{6mm}
+
+\begin{minipage}[t]{0.48\textwidth}
+\textbf{From}\\
+\VAR{vendor_name}\\
+\VAR{vendor_address}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\textbf{Bill To}\\
+\VAR{customer_name}\\
+\VAR{customer_address}
+\end{minipage}
+
+\vspace{6mm}
+\textbf{Invoice Date:} \VAR{invoice_date}\hfill\textbf{Due Date:} \VAR{due_date}
+
+\vspace{6mm}
+\begin{tabular}{p{0.46\textwidth}rrr}
+\toprule
+\textbf{Description} & \textbf{Qty} & \textbf{Unit Price} & \textbf{Amount}\\
+\midrule
+\BLOCK{for it in items}
+\VAR{it.description} & \VAR{it.quantity} & \VAR{currency}\VAR{it.unit_price} & \VAR{currency}\VAR{it.total}\\
+\BLOCK{endfor}
+\midrule
+ & & Subtotal & \VAR{currency}\VAR{subtotal}\\
+ & & Tax (\VAR{tax_rate}\%) & \VAR{currency}\VAR{tax}\\
+ & & \textbf{Total} & \textbf{\VAR{currency}\VAR{total}}\\
+\bottomrule
+\end{tabular}
+
+\vspace{8mm}
+\textbf{Payment Terms:} \VAR{payment_terms}
+
+\vfill
+{\small\color{gray} Thank you for your business.}
+\end{document}

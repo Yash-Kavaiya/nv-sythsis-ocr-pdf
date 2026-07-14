@@ -1,0 +1,77 @@
+"""Thin OpenAI-compatible chat client used for NVIDIA NIM endpoints.
+
+Set NVIDIA_API_KEY (and optionally NVIDIA_BASE_URL / NVIDIA_MODEL) to enable
+LLM-backed schema design and synthesis. Without a key the pipeline runs in
+fully-offline fallback mode.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+from typing import Any, Optional
+
+import httpx
+
+DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"
+DEFAULT_MODEL = "meta/llama-3.1-70b-instruct"
+
+
+class LLMClient:
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        model: Optional[str] = None,
+    ):
+        self.api_key = api_key or os.environ.get("NVIDIA_API_KEY", "")
+        self.base_url = (base_url or os.environ.get("NVIDIA_BASE_URL", DEFAULT_BASE_URL)).rstrip("/")
+        self.model = model or os.environ.get("NVIDIA_MODEL", DEFAULT_MODEL)
+
+    @property
+    def available(self) -> bool:
+        return bool(self.api_key)
+
+    def chat(
+        self,
+        messages: list[dict[str, Any]],
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        model: Optional[str] = None,
+    ) -> str:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        payload = {
+            "model": model or self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        with httpx.Client(timeout=120) as client:
+            resp = client.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+        return data["choices"][0]["message"]["content"]
+
+
+def extract_json(text: str) -> Any:
+    """Pull the first JSON object/array out of an LLM response."""
+    fence = re.search(r"```(?:json)?\s*(.+?)```", text, re.DOTALL)
+    if fence:
+        text = fence.group(1)
+    text = text.strip()
+    # Try direct parse first, then scan for the outermost bracket pair.
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    for opener, closer in (("{", "}"), ("[", "]")):
+        start = text.find(opener)
+        end = text.rfind(closer)
+        if start != -1 and end > start:
+            try:
+                return json.loads(text[start : end + 1])
+            except json.JSONDecodeError:
+                continue
+    raise ValueError("No parseable JSON found in model response")

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Synthetic OCR PDF Studio</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><rect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%2376b900%22/><text x=%228%22 y=%2212%22 font-size=%2210%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22>N</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="logo"><span class="nv">&#9646;</span> Synthetic OCR PDF Studio</div>
+    <nav>
+      <a href="/" class="active">Studio</a>
+      <a href="/eval.html">Eval Lab</a>
+    </nav>
+    <div class="health" id="health">
+      <span><span class="dot" id="llm-dot"></span><span id="llm-label">LLM: checking&hellip;</span></span>
+      <span><span class="dot on"></span><span id="pdf-label">PDF: &hellip;</span></span>
+    </div>
+  </header>
+
+  <main>
+    <h1>Generate synthetic documents for OCR</h1>
+    <p class="subtitle">
+      One prompt &rarr; NeMo-style Curator &rarr; Data Designer &rarr; Synthesizer &rarr;
+      JSON ground truth &rarr; LaTeX agent harness &rarr; PDF. Then score your own OCR model in the
+      <a href="/eval.html">Eval Lab</a>.
+    </p>
+
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <h2>Pipeline input</h2>
+          <label>Seed source</label>
+          <div class="radio-row">
+            <label><input type="radio" name="source" value="empty" checked>Empty</label>
+            <label><input type="radio" name="source" value="sample">Sample data</label>
+            <label><input type="radio" name="source" value="huggingface">HuggingFace</label>
+          </div>
+
+          <div id="hf-fields" style="display:none">
+            <label for="hf-dataset">HuggingFace dataset</label>
+            <input type="text" id="hf-dataset" placeholder="e.g. gretelai/synthetic_text_to_sql">
+            <div class="hint">Rows are fetched via the datasets-server API and fed to the Curator.</div>
+            <button class="secondary" id="hf-preview-btn" style="margin-top:8px">Preview rows</button>
+            <pre id="hf-preview" style="font-size:11px; max-height:180px; overflow:auto"></pre>
+          </div>
+
+          <label for="prompt">One prompt</label>
+          <textarea id="prompt" placeholder="e.g. Pharmacy invoices from small Indian retailers with GST, in rupees"></textarea>
+
+          <label for="doc-type">Document type</label>
+          <select id="doc-type">
+            <option value="">Auto (let the Data Designer decide)</option>
+            <option value="invoice">Invoice</option>
+            <option value="receipt">Receipt</option>
+            <option value="letter">Letter</option>
+            <option value="form">Form</option>
+          </select>
+
+          <label for="num-docs">Number of documents</label>
+          <input type="number" id="num-docs" value="5" min="1" max="50">
+
+          <button class="block" id="run-btn">Run pipeline</button>
+          <div id="run-error"></div>
+        </div>
+
+        <div class="card">
+          <h2>Previous runs</h2>
+          <div id="runs-list" class="empty">No runs yet.</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h2>Pipeline stages</h2>
+          <div class="stages" id="stages"></div>
+        </div>
+
+        <div class="card" id="results-card" style="display:none">
+          <h2>Generated documents <span class="badge" id="run-id-badge"></span></h2>
+          <div class="pill-row">
+            <a id="download-dataset" href="#" class="badge">&darr; Download dataset JSON</a>
+            <span class="badge" id="schema-badge"></span>
+            <span class="badge" id="engine-badge"></span>
+          </div>
+          <div class="docs" id="docs"></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="footer-note">
+      Set <code>NVIDIA_API_KEY</code> on the server to enable LLM-backed design &amp; synthesis via
+      NVIDIA NIM; without it the pipeline runs a deterministic offline synthesizer.
+    </p>
+  </main>
+
+  <dialog class="viewer" id="viewer">
+    <div class="viewer-head">
+      <strong id="viewer-title"></strong>
+      <div class="tabs" id="viewer-tabs"></div>
+      <button class="close" onclick="document.getElementById('viewer').close()">&times;</button>
+    </div>
+    <div class="viewer-body" id="viewer-body"></div>
+  </dialog>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/studio.js"></script>
+</body>
+</html>
