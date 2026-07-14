@@ -13,6 +13,10 @@ SAMPLE_PATH = Path(__file__).resolve().parent.parent / "data" / "sample_seed.jso
 
 
 def load_sample_seed() -> list[dict[str, Any]]:
+    # Degrade to an empty seed rather than crashing if the corpus is missing;
+    # the Data Designer can still work from the prompt alone.
+    if not SAMPLE_PATH.exists():
+        return []
     return json.loads(SAMPLE_PATH.read_text())
 
 

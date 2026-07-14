@@ -72,7 +72,11 @@ function openViewer(runId, index, initialTab = "png") {
     } else {
       const resp = await fetch(url);
       const text = await resp.text();
-      const pretty = kind === "json" ? JSON.stringify(JSON.parse(text), null, 2) : text;
+      let pretty = text;
+      if (kind === "json") {
+        // The endpoint may return a non-JSON error body; show it raw rather than throwing.
+        try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (_) { pretty = text; }
+      }
       body.append(el("pre", { text: pretty }));
     }
   }

@@ -15,7 +15,7 @@ from .fpdf_renderer import render_pdf
 
 def find_latex_engine() -> Optional[list[str]]:
     if shutil.which("tectonic"):
-        return ["tectonic", "--keep-logs=false"]
+        return ["tectonic", "--chatter", "minimal"]
     for engine in ("pdflatex", "xelatex"):
         if shutil.which(engine):
             return [engine, "-interaction=nonstopmode", "-halt-on-error"]
