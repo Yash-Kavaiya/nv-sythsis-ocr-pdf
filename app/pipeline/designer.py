@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from .llm import LLMClient, extract_json
+from .llm import LLMClient, extract_json, ensure_json_object
 
 DOC_TYPE_KEYWORDS = {
     "invoice": ["invoice", "bill", "billing", "gst", "tax invoice", "purchase order"],
@@ -112,7 +112,7 @@ def design_schema(
                 ],
                 temperature=0.4,
             )
-            design = extract_json(raw)
+            design = ensure_json_object(raw)
             report["llm_backed"] = True
         except Exception as exc:  # fall back below
             report["llm_error"] = str(exc)[:300]

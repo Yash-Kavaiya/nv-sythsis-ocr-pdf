@@ -75,3 +75,17 @@ def extract_json(text: str) -> Any:
             except json.JSONDecodeError:
                 continue
     raise ValueError("No parseable JSON found in model response")
+
+
+def ensure_json_object(text: str) -> dict[str, Any]:
+    """Extract JSON and ensure it's an object (dict), not an array."""
+    result = extract_json(text)
+    if isinstance(result, list):
+        # If it's an array, take the first element if it's an object
+        if result and isinstance(result[0], dict):
+            return result[0]
+        # Otherwise return empty dict
+        return {}
+    if isinstance(result, dict):
+        return result
+    return {}
