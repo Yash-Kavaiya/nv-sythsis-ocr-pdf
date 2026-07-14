@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
-data/
+# runtime run/eval persistence at the repo root (DATA_DIR default); NOT app/data/
+/data/
 .env
 node_modules/
 nohup.out

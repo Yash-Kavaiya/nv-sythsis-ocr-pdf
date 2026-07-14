@@ -21,9 +21,16 @@ def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
 
 
+def _within(path: Path, base: Path) -> bool:
+    """True iff `path` is `base` itself or nested under it (no prefix-sibling escape)."""
+    base = base.resolve()
+    path = path.resolve()
+    return path == base or base in path.parents
+
+
 def run_dir(run_id: str) -> Path:
     path = (RUNS_DIR / run_id).resolve()
-    if not str(path).startswith(str(RUNS_DIR.resolve())):
+    if not _within(path, RUNS_DIR):
         raise ValueError("invalid run id")
     return path
 
@@ -66,7 +73,7 @@ def save_eval(result: dict[str, Any]) -> None:
 
 def load_eval(eval_id: str) -> dict[str, Any]:
     path = (EVALS_DIR / f"{eval_id}.json").resolve()
-    if not str(path).startswith(str(EVALS_DIR.resolve())) or not path.exists():
+    if not _within(path, EVALS_DIR) or not path.exists():
         raise FileNotFoundError(eval_id)
     return json.loads(path.read_text())
 

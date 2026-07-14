@@ -107,10 +107,18 @@ function renderChart(docs) {
     });
     hit.addEventListener("mousemove", (evt) => {
       const rect = box.getBoundingClientRect();
-      tooltip.innerHTML = doc.error
-        ? `<span class="k">doc ${doc.index}</span> <span class="v">failed</span><br><span class="k">${doc.error.slice(0, 60)}</span>`
-        : `<span class="k">doc ${doc.index}</span> <span class="v">${fmtPct(doc.field_accuracy)}</span><br>` +
-          `<span class="k">fuzzy ${fmtPct(doc.fuzzy_field_accuracy)} · CER ${fmtPct(doc.cer)}</span>`;
+      // Build via DOM nodes (textContent) — doc.error is untrusted (model/endpoint text).
+      tooltip.textContent = "";
+      const line1 = el("div", {}, [
+        el("span", { class: "k", text: `doc ${doc.index} ` }),
+        doc.error
+          ? el("span", { class: "v", text: "failed" })
+          : el("span", { class: "v", text: fmtPct(doc.field_accuracy) }),
+      ]);
+      const line2 = doc.error
+        ? el("span", { class: "k", text: String(doc.error).slice(0, 60) })
+        : el("span", { class: "k", text: `fuzzy ${fmtPct(doc.fuzzy_field_accuracy)} · CER ${fmtPct(doc.cer)}` });
+      tooltip.append(line1, line2);
       tooltip.style.left = Math.min(evt.clientX - rect.left + 12, rect.width - 180) + "px";
       tooltip.style.top = (evt.clientY - rect.top - 40) + "px";
       tooltip.classList.add("show");
