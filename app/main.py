@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import storage
 from .evals.metrics import aggregate
-from .evals.runner import run_eval
+from .evals.runner import resolve_model_config, run_eval
 from .latex.harness import generate_tex
 from .models import EvalRequest, PipelineRequest
 from .pdfgen.compiler import create_pdf, find_latex_engine, pdf_to_png
@@ -200,16 +200,25 @@ def eval_run(req: EvalRequest):
     except (FileNotFoundError, ValueError):
         raise HTTPException(status_code=404, detail="run not found")
 
+    model_cfg = req.model_config_
+    if req.mode == "model":
+        if model_cfg is None:
+            raise HTTPException(status_code=400, detail="model_config is required for mode='model'")
+        try:
+            model_cfg = resolve_model_config(model_cfg)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
     rdir = storage.run_dir(req.run_id)
     doc_results = run_eval(
-        rdir, manifest, req.mode, req.model_config_, req.predictions, req.doc_indices
+        rdir, manifest, req.mode, model_cfg, req.predictions, req.doc_indices
     )
     result = {
         "eval_id": storage.new_id("eval"),
         "run_id": req.run_id,
         "created_at": storage.now_iso(),
         "mode": req.mode,
-        "model_name": req.model_config_.model if req.model_config_ else None,
+        "model_name": model_cfg.model if model_cfg else None,
         "docs": doc_results,
         "aggregate": aggregate(doc_results),
     }

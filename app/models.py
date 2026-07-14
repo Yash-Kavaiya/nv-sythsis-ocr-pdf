@@ -48,11 +48,21 @@ class RunManifest(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+ModelProvider = Literal[
+    "nvidia", "openai", "openrouter", "gemini", "anthropic", "azure", "github", "custom"
+]
+
+
 class ModelConfig(BaseModel):
-    base_url: str = Field(..., description="OpenAI-compatible base URL, e.g. https://integrate.api.nvidia.com/v1")
+    base_url: str = Field(
+        default="", description="OpenAI-compatible base URL, e.g. https://integrate.api.nvidia.com/v1"
+    )
     api_key: str = ""
-    model: str = Field(..., description="Model name, e.g. meta/llama-3.2-90b-vision-instruct")
+    model: str = Field(default="", description="Model name, e.g. meta/llama-3.2-90b-vision-instruct")
     max_tokens: int = 2048
+    provider: ModelProvider = "custom"
+
+
 
 
 class EvalRequest(BaseModel):

@@ -1,4 +1,16 @@
-/* Shared helpers: API wrapper, health badge, artifact viewer. */
+/* Shared helpers: API wrapper, health badge, artifact viewer, theme toggle. */
+
+function initThemeToggle() {
+  const btn = document.getElementById("theme-toggle-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    const next = current === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("theme", next); } catch (e) {}
+  });
+}
+initThemeToggle();
 
 async function api(path, options = {}) {
   const resp = await fetch(path, {

@@ -6,14 +6,34 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from pathlib import Path
 from typing import Any, Optional
 
 import httpx
 
 from ..models import ModelConfig
-from ..pipeline.llm import extract_json
+from ..pipeline.llm import DEFAULT_BASE_URL as NVIDIA_DEFAULT_BASE_URL
+from ..pipeline.llm import extract_json, raise_for_status_with_body
 from .metrics import aggregate, evaluate_doc
+
+NVIDIA_DEFAULT_VISION_MODEL = "meta/llama-3.2-90b-vision-instruct"
+
+
+def resolve_model_config(cfg: ModelConfig) -> ModelConfig:
+    """Fill in the server's NVIDIA_API_KEY/base URL/model when the user picks
+    the NVIDIA provider and leaves fields blank, so no setup is needed there.
+    Every other provider must supply base_url + model explicitly."""
+    if cfg.provider == "nvidia":
+        return cfg.model_copy(update={
+            "base_url": cfg.base_url or os.environ.get("NVIDIA_BASE_URL", NVIDIA_DEFAULT_BASE_URL),
+            "api_key": cfg.api_key or os.environ.get("NVIDIA_API_KEY", ""),
+            "model": cfg.model or os.environ.get("NVIDIA_VISION_MODEL", NVIDIA_DEFAULT_VISION_MODEL),
+        })
+    if not cfg.base_url or not cfg.model:
+        raise ValueError("Base URL and model are required for this provider")
+    return cfg
+
 
 OCR_PROMPT = """You are an OCR extraction engine. Read the document image and extract ALL of its content \
 as a single JSON object with exactly these keys: {keys}. \
@@ -25,8 +45,7 @@ Output ONLY the JSON object."""
 def call_vision_model(cfg: ModelConfig, png_path: str, gt_keys: list[str]) -> dict[str, Any]:
     image_b64 = base64.b64encode(Path(png_path).read_bytes()).decode()
     headers = {"Content-Type": "application/json"}
-    if cfg.api_key:
-        headers["Authorization"] = f"Bearer {cfg.api_key}"
+    provider = cfg.provider or "custom"
     payload = {
         "model": cfg.model,
         "max_tokens": cfg.max_tokens,
@@ -42,11 +61,25 @@ def call_vision_model(cfg: ModelConfig, png_path: str, gt_keys: list[str]) -> di
             }
         ],
     }
+    if provider == "azure":
+        # Microsoft Azure OpenAI: the user supplies the full deployment URL
+        # (…/openai/deployments/<deployment>/chat/completions?api-version=…)
+        # and auth uses the "api-key" header instead of a bearer token.
+        if cfg.api_key:
+            headers["api-key"] = cfg.api_key
+        url = cfg.base_url
+    else:
+        # NVIDIA NIM, OpenAI, OpenRouter, Gemini, Anthropic and GitHub Models
+        # all expose an OpenAI-compatible /chat/completions endpoint with
+        # bearer-token auth, so the same request shape works for all of them.
+        if cfg.api_key:
+            headers["Authorization"] = f"Bearer {cfg.api_key}"
+        if provider == "anthropic":
+            headers["anthropic-version"] = "2023-06-01"
+        url = f"{cfg.base_url.rstrip('/')}/chat/completions"
     with httpx.Client(timeout=180) as client:
-        resp = client.post(
-            f"{cfg.base_url.rstrip('/')}/chat/completions", json=payload, headers=headers
-        )
-        resp.raise_for_status()
+        resp = client.post(url, json=payload, headers=headers)
+        raise_for_status_with_body(resp)
         content = resp.json()["choices"][0]["message"]["content"]
     parsed = extract_json(content)
     if not isinstance(parsed, dict):
@@ -97,4 +130,4 @@ def run_eval(
     return results
 
 
-__all__ = ["run_eval", "call_vision_model", "aggregate"]
+__all__ = ["run_eval", "call_vision_model", "resolve_model_config", "aggregate"]

@@ -5,7 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Eval Lab · Synthetic OCR PDF Studio</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><rect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%2376b900%22/><text x=%228%22 y=%2212%22 font-size=%2210%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22>N</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("theme");
+        if (t !== "light" && t !== "dark") {
+          t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <header>
@@ -18,12 +32,17 @@
       <span><span class="dot" id="llm-dot"></span><span id="llm-label">LLM: checking&hellip;</span></span>
       <span><span class="dot on"></span><span id="pdf-label">PDF: &hellip;</span></span>
     </div>
+    <button class="theme-toggle" id="theme-toggle-btn" type="button" aria-label="Toggle light/dark theme" title="Toggle theme">
+      <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+      <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </button>
   </header>
 
   <main>
     <h1>Evaluate your OCR model</h1>
     <p class="subtitle">
-      Bring your own model (any OpenAI-compatible vision endpoint) or upload its predictions.
+      Bring your own model &mdash; NVIDIA NIM, OpenAI, OpenRouter, Google Gemini, Anthropic Claude,
+      Microsoft Azure OpenAI or GitHub Models &mdash; or upload its predictions.
       We score it against the generated JSON ground truth and PDF structure.
     </p>
 
@@ -43,15 +62,39 @@
           </div>
 
           <div id="model-fields">
-            <label for="base-url">Base URL (OpenAI-compatible)</label>
-            <input type="text" id="base-url" placeholder="https://integrate.api.nvidia.com/v1">
-            <label for="api-key">API key</label>
-            <input type="password" id="api-key" placeholder="nvapi-… (sent server-side only for this eval)">
-            <label for="model-name">Model</label>
-            <input type="text" id="model-name" placeholder="e.g. meta/llama-3.2-90b-vision-instruct">
-            <div class="hint">Each document's rendered page image is sent to your endpoint with a
-              JSON-extraction prompt; the reply is parsed and scored.</div>
+            <label for="provider-select">Provider</label>
+            <select id="provider-select">
+              <option value="nvidia">NVIDIA NIM</option>
+              <option value="openai">OpenAI</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="anthropic">Anthropic Claude</option>
+              <option value="azure">Microsoft (Azure OpenAI)</option>
+              <option value="github">GitHub Models</option>
+              <option value="custom">Custom / other</option>
+            </select>
+            <div class="hint" id="provider-hint"></div>
+
+            <div id="nvidia-default-note" class="hint" style="display:none">
+              <span id="nvidia-default-text"></span>
+              <label style="display:inline-flex; align-items:center; gap:6px; text-transform:none; font-weight:500; font-size:12px; margin-top:6px; cursor:pointer;">
+                <input type="checkbox" id="nvidia-override-toggle" style="width:auto;">
+                Use a different NVIDIA key, endpoint or model
+              </label>
+            </div>
+
+            <div id="byo-fields">
+              <label for="base-url">Base URL (OpenAI-compatible)</label>
+              <input type="text" id="base-url" placeholder="https://integrate.api.nvidia.com/v1">
+              <label for="api-key">API key</label>
+              <input type="password" id="api-key" placeholder="nvapi-… (sent server-side only for this eval)">
+              <label for="model-name">Model</label>
+              <input type="text" id="model-name" placeholder="e.g. meta/llama-3.2-90b-vision-instruct">
+              <div class="hint">Each document's rendered page image is sent to your endpoint with a
+                JSON-extraction prompt; the reply is parsed and scored.</div>
+            </div>
           </div>
+
 
           <div id="upload-fields" style="display:none">
             <label for="predictions">Predictions JSON</label>

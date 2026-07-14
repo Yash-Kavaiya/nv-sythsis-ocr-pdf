@@ -2,7 +2,108 @@
 
 let currentRunId = null;
 
+/* ---- provider presets: direct integration for common OpenAI-compatible
+   vision endpoints. NVIDIA NIM stays the default (no change needed there). */
+const PROVIDER_PRESETS = {
+  nvidia: {
+    baseUrl: "https://integrate.api.nvidia.com/v1",
+    modelPlaceholder: "meta/llama-3.2-90b-vision-instruct",
+    keyPlaceholder: "nvapi-…",
+    hint: "NVIDIA NIM &mdash; get a free API key at <a href=\"https://build.nvidia.com\" target=\"_blank\" rel=\"noopener\">build.nvidia.com</a>.",
+  },
+  openai: {
+    baseUrl: "https://api.openai.com/v1",
+    modelPlaceholder: "gpt-4o-mini",
+    keyPlaceholder: "sk-…",
+    hint: "OpenAI &mdash; keys at <a href=\"https://platform.openai.com/api-keys\" target=\"_blank\" rel=\"noopener\">platform.openai.com/api-keys</a>.",
+  },
+  openrouter: {
+    baseUrl: "https://openrouter.ai/api/v1",
+    modelPlaceholder: "openai/gpt-4o-mini",
+    keyPlaceholder: "sk-or-…",
+    hint: "OpenRouter &mdash; one key for many models, see <a href=\"https://openrouter.ai/keys\" target=\"_blank\" rel=\"noopener\">openrouter.ai/keys</a>.",
+  },
+  gemini: {
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    modelPlaceholder: "gemini-2.0-flash",
+    keyPlaceholder: "AIza…",
+    hint: "Google Gemini via its OpenAI-compatible endpoint &mdash; keys at <a href=\"https://aistudio.google.com/apikey\" target=\"_blank\" rel=\"noopener\">aistudio.google.com/apikey</a>.",
+  },
+  anthropic: {
+    baseUrl: "https://api.anthropic.com/v1",
+    modelPlaceholder: "claude-3-5-sonnet-20241022",
+    keyPlaceholder: "sk-ant-…",
+    hint: "Anthropic Claude via its OpenAI-compatible endpoint &mdash; keys at <a href=\"https://console.anthropic.com\" target=\"_blank\" rel=\"noopener\">console.anthropic.com</a>.",
+  },
+  azure: {
+    baseUrl: "",
+    modelPlaceholder: "your deployment name, e.g. gpt-4o",
+    keyPlaceholder: "Azure API key",
+    hint: "Microsoft Azure OpenAI &mdash; paste the full deployment URL as Base URL, e.g. " +
+      "<code>https://&lt;resource&gt;.openai.azure.com/openai/deployments/&lt;deployment&gt;/chat/completions?api-version=2024-08-01-preview</code>.",
+  },
+  github: {
+    baseUrl: "https://models.github.ai/inference",
+    modelPlaceholder: "openai/gpt-4o-mini",
+    keyPlaceholder: "ghp_… (PAT with models: read)",
+    hint: "GitHub Models &mdash; free tier using a GitHub personal access token, see <a href=\"https://github.com/marketplace/models\" target=\"_blank\" rel=\"noopener\">github.com/marketplace/models</a>.",
+  },
+  custom: {
+    baseUrl: "",
+    modelPlaceholder: "e.g. my-model",
+    keyPlaceholder: "API key (optional)",
+    hint: "Any OpenAI-compatible <code>/chat/completions</code> vision endpoint.",
+  },
+};
+
+function applyProviderPreset(id) {
+  const preset = PROVIDER_PRESETS[id] || PROVIDER_PRESETS.custom;
+  const baseUrlInput = document.getElementById("base-url");
+  const apiKeyInput = document.getElementById("api-key");
+  const modelInput = document.getElementById("model-name");
+  baseUrlInput.value = preset.baseUrl;
+  baseUrlInput.placeholder = preset.baseUrl || "https://your-endpoint/v1";
+  apiKeyInput.placeholder = preset.keyPlaceholder;
+  modelInput.placeholder = preset.modelPlaceholder;
+  document.getElementById("provider-hint").innerHTML = preset.hint;
+}
+
+/* ---- NVIDIA: the server may already have NVIDIA_API_KEY configured (same
+   env var used by the Studio pipeline), in which case selecting NVIDIA here
+   needs no Base URL / API key / Model input at all. */
+let serverHasNvidiaKey = false;
+
+function updateFieldVisibility() {
+  const provider = document.getElementById("provider-select").value;
+  const overrideChecked = document.getElementById("nvidia-override-toggle").checked;
+  const isNvidiaWithServerKey = provider === "nvidia" && serverHasNvidiaKey;
+  document.getElementById("nvidia-default-note").style.display = isNvidiaWithServerKey ? "" : "none";
+  document.getElementById("byo-fields").style.display =
+    isNvidiaWithServerKey && !overrideChecked ? "none" : "";
+}
+
+document.getElementById("provider-select").addEventListener("change", (e) => {
+  applyProviderPreset(e.target.value);
+  document.getElementById("nvidia-override-toggle").checked = false;
+  updateFieldVisibility();
+});
+document.getElementById("nvidia-override-toggle").addEventListener("change", updateFieldVisibility);
+applyProviderPreset(document.getElementById("provider-select").value);
+
+(async function initNvidiaDefault() {
+  let health = null;
+  try {
+    health = await api("/api/health");
+  } catch (_) { /* server unreachable; treat as no key configured */ }
+  serverHasNvidiaKey = !!(health && health.llm_available);
+  document.getElementById("nvidia-default-text").textContent = serverHasNvidiaKey
+    ? "Using the server's configured NVIDIA_API_KEY — no setup needed."
+    : "";
+  updateFieldVisibility();
+})();
+
 async function loadRunOptions() {
+
   const select = document.getElementById("run-select");
   select.innerHTML = "";
   const runs = await api("/api/runs");
@@ -228,9 +329,12 @@ document.getElementById("eval-btn").addEventListener("click", async () => {
   const mode = document.querySelector('input[name="mode"]:checked').value;
   const body = { run_id: runId, mode };
   if (mode === "model") {
+    const provider = document.getElementById("provider-select").value;
+    const usingNvidiaDefaults = provider === "nvidia" && serverHasNvidiaKey &&
+      !document.getElementById("nvidia-override-toggle").checked;
     const baseUrl = document.getElementById("base-url").value.trim();
     const model = document.getElementById("model-name").value.trim();
-    if (!baseUrl || !model) {
+    if (!usingNvidiaDefaults && (!baseUrl || !model)) {
       errBox.append(el("div", { class: "error-box", text: "Base URL and model name are required." }));
       return;
     }
@@ -238,6 +342,7 @@ document.getElementById("eval-btn").addEventListener("click", async () => {
       base_url: baseUrl,
       api_key: document.getElementById("api-key").value.trim(),
       model,
+      provider,
     };
   } else {
     try {

@@ -17,6 +17,20 @@ DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"
 DEFAULT_MODEL = "meta/llama-3.1-70b-instruct"
 
 
+def raise_for_status_with_body(resp: httpx.Response) -> None:
+    """Like ``resp.raise_for_status()`` but fold the response body into the
+    error message. Providers put the actual reason there (NVIDIA returns
+    ``403 ... "Authorization failed"`` for a bad key vs ``401`` for a missing
+    one), which the stock httpx message discards - leaving only a bare status."""
+    if not resp.is_error:
+        return
+    body = resp.text.strip()
+    message = f"{resp.status_code} {resp.reason_phrase} for {resp.request.url}"
+    if body:
+        message += f": {body[:400]}"
+    raise httpx.HTTPStatusError(message, request=resp.request, response=resp)
+
+
 class LLMClient:
     def __init__(
         self,
@@ -50,7 +64,7 @@ class LLMClient:
         }
         with httpx.Client(timeout=120) as client:
             resp = client.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
-            resp.raise_for_status()
+            raise_for_status_with_body(resp)
             data = resp.json()
         return data["choices"][0]["message"]["content"]
 
