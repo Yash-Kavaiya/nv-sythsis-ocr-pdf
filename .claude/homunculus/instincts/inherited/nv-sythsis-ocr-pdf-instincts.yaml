@@ -1,0 +1,278 @@
+# Instincts generated from https://github.com/Yash-Kavaiya/nv-sythsis-ocr-pdf
+# Generated: 2026-07-14T15:38:20.765Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: nv-sythsis-ocr-pdf-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Commit Length
+
+## Action
+
+Keep commit messages concise (~42 characters)
+
+## Evidence
+
+- Average commit message length: 42 chars
+- Based on 1 commits
+
+---
+id: nv-sythsis-ocr-pdf-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: nv-sythsis-ocr-pdf-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: nv-sythsis-ocr-pdf-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: nv-sythsis-ocr-pdf-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: nv-sythsis-ocr-pdf-instinct-file-naming
+trigger: "When creating a new Python file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Instinct File Naming
+
+## Action
+
+Name the file using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.files: camelCase
+
+---
+id: nv-sythsis-ocr-pdf-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Instinct Function Naming
+
+## Action
+
+Use camelCase for the function name
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: nv-sythsis-ocr-pdf-instinct-class-naming
+trigger: "When defining a new class"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Instinct Class Naming
+
+## Action
+
+Use PascalCase for the class name
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: nv-sythsis-ocr-pdf-instinct-constant-naming
+trigger: "When declaring a constant"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Instinct Constant Naming
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for the constant name
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: nv-sythsis-ocr-pdf-instinct-import-style
+trigger: "When importing modules within the package"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Instinct Import Style
+
+## Action
+
+Use relative imports
+
+## Evidence
+
+- Pattern in importStyle: relative
+
+---
+id: nv-sythsis-ocr-pdf-instinct-export-style
+trigger: "When exporting functions or classes from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in exportStyle: named
+
+---
+id: nv-sythsis-ocr-pdf-instinct-error-handling
+trigger: "When handling potential errors in code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Instinct Error Handling
+
+## Action
+
+Use try-catch blocks for error handling
+
+## Evidence
+
+- Pattern in errorHandling.style: try-catch
+
+---
+id: nv-sythsis-ocr-pdf-instinct-test-location
+trigger: "When adding new tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Instinct Test Location
+
+## Action
+
+Place test files in a separate folder from source code
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation: separate
+
+---
+id: nv-sythsis-ocr-pdf-instinct-git-commit-format
+trigger: "When writing a git commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: Yash-Kavaiya/nv-sythsis-ocr-pdf
+---
+
+# Nv Sythsis Ocr Pdf Instinct Git Commit Format
+
+## Action
+
+Use a freeform message without a prefix, typically concise (around 42 characters)
+
+## Evidence
+
+- Pattern in commits.type: freeform
+- Pattern in commits.averageLength: 42
+
