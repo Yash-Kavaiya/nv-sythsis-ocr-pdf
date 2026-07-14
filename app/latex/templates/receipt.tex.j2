@@ -1,0 +1,37 @@
+\documentclass[11pt]{article}
+\usepackage[paperwidth=9cm,paperheight=22cm,margin=0.8cm]{geometry}
+\usepackage{array}
+\renewcommand{\familydefault}{\ttdefault}
+\setlength{\parindent}{0pt}
+\pagestyle{empty}
+\begin{document}
+\begin{center}
+{\large\bfseries \VAR{store_name}}\\
+{\footnotesize \VAR{store_address}}\\[1mm]
+\rule{\linewidth}{0.4pt}
+\end{center}
+
+{\footnotesize
+Receipt: \VAR{receipt_number}\\
+Date: \VAR{date}\quad Time: \VAR{time}\\
+Cashier: \VAR{cashier}\\
+\rule{\linewidth}{0.4pt}
+
+\begin{tabular}{@{}p{3.4cm}@{\ }r@{\ }r@{\ }r@{}}
+\BLOCK{for it in items}
+\VAR{it.description} & \VAR{it.quantity} & \VAR{it.unit_price} & \VAR{it.total}\\
+\BLOCK{endfor}
+\end{tabular}
+
+\rule{\linewidth}{0.4pt}
+\begin{tabular}{@{}p{4.2cm}@{}r@{}}
+SUBTOTAL & \VAR{currency}\VAR{subtotal}\\
+TAX & \VAR{currency}\VAR{tax}\\
+\textbf{TOTAL} & \textbf{\VAR{currency}\VAR{total}}\\
+\end{tabular}
+
+\rule{\linewidth}{0.4pt}
+Paid: \VAR{payment_method} \BLOCK{if card_last4}****\VAR{card_last4}\BLOCK{endif}\\[2mm]
+\begin{center}*** THANK YOU ***\end{center}
+}
+\end{document}

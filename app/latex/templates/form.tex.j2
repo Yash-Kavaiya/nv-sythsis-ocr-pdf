@@ -1,0 +1,32 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{array,booktabs}
+\renewcommand{\familydefault}{\sfdefault}
+\setlength{\parindent}{0pt}
+\begin{document}
+\begin{center}
+{\large \VAR{organization}}\\[2mm]
+{\LARGE\bfseries \VAR{form_title}}\\[1mm]
+Reference No: \VAR{reference_number}
+\end{center}
+
+\vspace{6mm}\hrule\vspace{6mm}
+
+\begin{tabular}{p{0.32\textwidth}p{0.58\textwidth}}
+\textbf{Applicant Name} & \VAR{applicant_name}\\[2mm]
+\textbf{Date of Birth} & \VAR{date_of_birth}\\[2mm]
+\textbf{Address} & \VAR{address}\\[2mm]
+\textbf{Phone} & \VAR{phone}\\[2mm]
+\textbf{Email} & \VAR{email}\\[2mm]
+\textbf{Submission Date} & \VAR{submission_date}\\
+\end{tabular}
+
+\vspace{10mm}
+\textbf{Declaration:} \VAR{declaration}.
+
+\vspace{14mm}
+\begin{tabular}{p{0.4\textwidth}p{0.4\textwidth}}
+\rule{5cm}{0.4pt} & \rule{5cm}{0.4pt}\\
+Signature of Applicant & For Office Use Only\\
+\end{tabular}
+\end{document}
