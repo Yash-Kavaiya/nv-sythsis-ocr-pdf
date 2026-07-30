@@ -5,6 +5,7 @@ import CuratorPage from "./pages/CuratorPage";
 import DesignerPage from "./pages/DesignerPage";
 import SynthesizerPage from "./pages/SynthesizerPage";
 import ClawPage from "./pages/ClawPage";
+import EvaluatorPage from "./pages/EvaluatorPage";
 import ClawRail from "./components/ClawRail";
 import { useRun } from "./state/runStore";
 
@@ -18,6 +19,8 @@ function StageContent({ step }: { step: number }) {
       return <SynthesizerPage />;
     case 3:
       return <ClawPage />;
+    case 4:
+      return <EvaluatorPage />;
     default:
       return (
         <p className="subtitle">Stage {step + 1} — coming soon.</p>
