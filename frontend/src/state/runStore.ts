@@ -38,6 +38,8 @@ export function isStepEnabled(
   const status = stageStatus ?? {};
   for (let i = 0; i < stepIndex; i++) {
     const key = STAGE_KEYS[i];
+    // Claw is an optional orchestrator — it never sets stage_status and must not block Evaluator.
+    if (key === "claw") continue;
     const s = status[key] ?? "idle";
     if (s !== "done" && s !== "stale") return false;
   }
