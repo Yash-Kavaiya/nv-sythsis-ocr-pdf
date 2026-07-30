@@ -42,3 +42,18 @@ def test_curate_sample_writes_curated(client, tmp_path):
     assert body["manifest"]["stage_status"]["curator"] == "done"
     curated = (tmp_path / "runs" / run_id / "curated.json").read_text()
     assert len(curated) > 2
+
+
+def test_design_requires_curator(client):
+    run_id = client.post("/api/runs", json={"prompt": "invoices"}).json()["run_id"]
+    r = client.post(f"/api/runs/{run_id}/design", json={"prompt": "pharmacy invoices INR"})
+    assert r.status_code in (400, 409)
+
+
+def test_design_after_curate(client, tmp_path):
+    run_id = client.post("/api/runs", json={"prompt": "invoices"}).json()["run_id"]
+    client.post(f"/api/runs/{run_id}/curate", json={"source_type": "empty"})
+    r = client.post(f"/api/runs/{run_id}/design", json={"prompt": "pharmacy invoices in rupees"})
+    assert r.status_code == 200
+    assert r.json()["manifest"]["stage_status"]["designer"] == "done"
+    assert (tmp_path / "runs" / run_id / "schema.json").exists()

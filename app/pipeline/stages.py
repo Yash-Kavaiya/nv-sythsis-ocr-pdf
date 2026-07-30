@@ -6,7 +6,8 @@ from typing import Any
 
 from .. import storage
 from ..models import CurateRequest
-from . import curator, hf_loader
+from . import curator, designer, hf_loader
+from .llm import LLMClient
 
 STAGE_ORDER = ["curator", "designer", "synthesizer", "claw", "evaluator"]
 
@@ -184,5 +185,64 @@ def run_curate(run_id: str, req: CurateRequest) -> dict[str, Any]:
 
     _append_stage_report(manifest, "seed", seed_detail)
     manifest = set_stage_status(manifest, "curator", "done", detail=curator_report)
+    storage.save_manifest(manifest)
+    return {"ok": True, "manifest": manifest}
+
+
+def run_design(run_id: str, prompt: str, doc_type: str | None, llm: LLMClient) -> dict[str, Any]:
+    try:
+        manifest = storage.load_manifest(run_id)
+    except (FileNotFoundError, ValueError):
+        raise RunNotFoundError(run_id)
+
+    curator_status = manifest.get("stage_status", {}).get("curator", "idle")
+    if curator_status != "done":
+        try:
+            storage.read_run_json(run_id, "curated.json")
+        except FileNotFoundError:
+            _fail_stage(
+                manifest,
+                "designer",
+                "Curator must complete before design",
+                hint="Run POST /api/runs/{id}/curate first.",
+                http_status=400,
+            )
+
+    manifest = _mark_done_downstream_stale(manifest, "designer")
+    manifest = set_stage_status(manifest, "designer", "running")
+    storage.save_manifest(manifest)
+
+    try:
+        curated = storage.read_run_json(run_id, "curated.json")
+    except FileNotFoundError:
+        _fail_stage(
+            manifest,
+            "designer",
+            "curated.json not found",
+            hint="Run POST /api/runs/{id}/curate first.",
+            http_status=400,
+        )
+
+    stats = curator.seed_stats(curated)
+
+    try:
+        schema, design_report = designer.design_schema(prompt, stats, llm, doc_type)
+    except Exception as exc:
+        _fail_stage(
+            manifest,
+            "designer",
+            str(exc),
+            hint="Retry design, or set NVIDIA_API_KEY for NIM; offline keyword design is available.",
+            http_status=502,
+        )
+
+    storage.write_run_json(run_id, "schema.json", schema)
+    storage.write_run_json(run_id, "reports/designer.json", design_report)
+
+    manifest["schema"] = schema
+    if design_report.get("llm_backed"):
+        manifest["llm_backed"] = True
+
+    manifest = set_stage_status(manifest, "designer", "done", detail=design_report)
     storage.save_manifest(manifest)
     return {"ok": True, "manifest": manifest}

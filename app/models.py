@@ -25,6 +25,11 @@ class CurateRequest(BaseModel):
     hf_split: str = "train"
 
 
+class DesignRequest(BaseModel):
+    prompt: str = Field(..., min_length=3)
+    doc_type: Optional[DocType] = None
+
+
 class StageErrorBody(BaseModel):
     ok: bool = False
     stage: str

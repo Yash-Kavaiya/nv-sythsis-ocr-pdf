@@ -19,7 +19,7 @@ from . import storage
 from .evals.metrics import aggregate
 from .evals.runner import resolve_model_config, run_eval
 from .latex.harness import generate_tex
-from .models import CreateRunRequest, CurateRequest, EvalRequest, PipelineRequest, StageErrorBody
+from .models import CreateRunRequest, CurateRequest, DesignRequest, EvalRequest, PipelineRequest, StageErrorBody
 from .pipeline import stages
 from .pdfgen.compiler import create_pdf, find_latex_engine, pdf_to_png
 from .pipeline import curator, designer, hf_loader, synthesizer
@@ -155,6 +155,18 @@ def runs_create(req: CreateRunRequest):
 def runs_curate(run_id: str, req: CurateRequest):
     try:
         return stages.run_curate(run_id, req)
+    except stages.RunNotFoundError:
+        raise HTTPException(status_code=404, detail="run not found")
+    except stages.StageFailure as exc:
+        body = StageErrorBody(stage=exc.stage, error=exc.error, hint=exc.hint)
+        return JSONResponse(status_code=exc.http_status, content=body.model_dump())
+
+
+@app.post("/api/runs/{run_id}/design")
+def runs_design(run_id: str, req: DesignRequest):
+    llm = LLMClient()
+    try:
+        return stages.run_design(run_id, req.prompt, req.doc_type, llm)
     except stages.RunNotFoundError:
         raise HTTPException(status_code=404, detail="run not found")
     except stages.StageFailure as exc:
