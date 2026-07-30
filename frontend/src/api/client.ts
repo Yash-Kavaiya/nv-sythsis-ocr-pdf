@@ -147,3 +147,26 @@ export async function runEval(body: object): Promise<unknown> {
 export async function health(): Promise<unknown> {
   return request<unknown>("/api/health");
 }
+
+export async function hfPreview(
+  dataset: string,
+  config?: string,
+  split = "train",
+  limit = 3,
+): Promise<{ rows: unknown[]; count: number }> {
+  const params = new URLSearchParams({ dataset, split, limit: String(limit) });
+  if (config) params.set("config", config);
+  return request(`/api/hf/preview?${params}`);
+}
+
+export async function samplePreview(): Promise<{ rows: unknown[]; count: number }> {
+  return request("/api/sample/preview");
+}
+
+export async function listEvals(): Promise<unknown[]> {
+  return request<unknown[]>("/api/evals");
+}
+
+export async function getEval(evalId: string): Promise<unknown> {
+  return request<unknown>(`/api/evals/${evalId}`);
+}

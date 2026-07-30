@@ -1,10 +1,22 @@
 import { useState } from "react";
 import { ApiError, createRun } from "./api/client";
 import Stepper from "./components/Stepper";
+import CuratorPage from "./pages/CuratorPage";
 import { useRun } from "./state/runStore";
 
+function StageContent({ step }: { step: number }) {
+  switch (step) {
+    case 0:
+      return <CuratorPage />;
+    default:
+      return (
+        <p className="subtitle">Stage {step + 1} — coming soon.</p>
+      );
+  }
+}
+
 export default function App() {
-  const { runId, manifest, setManifest, setStep } = useRun();
+  const { runId, manifest, setManifest, setStep, step } = useRun();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,17 +60,13 @@ export default function App() {
 
       <main>
         {error ? <div className="error-box">{error}</div> : null}
-        <p className="subtitle">
-          {runId
-            ? `Run ${runId} — select a stage above to begin.`
-            : "Create a run to start the wizard."}
-        </p>
         {manifest?.stage_error ? (
           <div className="error-box" role="alert">
             {manifest.stage_error.stage}: {manifest.stage_error.error}
             {manifest.stage_error.hint ? ` — ${manifest.stage_error.hint}` : ""}
           </div>
         ) : null}
+        <StageContent step={step} />
       </main>
     </>
   );
