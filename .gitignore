@@ -5,3 +5,5 @@ data/
 node_modules/
 nohup.out
 *.log
+
+.worktrees/
