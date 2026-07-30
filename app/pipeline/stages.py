@@ -6,7 +6,7 @@ from typing import Any
 
 from .. import storage
 from ..latex.harness import generate_tex
-from ..models import CurateRequest
+from ..models import CurateRequest, PipelineRequest
 from ..pdfgen.compiler import create_pdf, pdf_to_png
 from . import curator, designer, hf_loader, synthesizer
 from .llm import LLMClient
@@ -362,3 +362,21 @@ def run_synthesize(
     manifest = set_stage_status(manifest, "synthesizer", "done", detail=synth_report)
     storage.save_manifest(manifest)
     return {"ok": True, "manifest": manifest}
+
+
+def run_pipeline_all(req: PipelineRequest, llm: LLMClient) -> dict[str, Any]:
+    manifest = create_run(req.prompt, req.source_type)
+    run_id = manifest["run_id"]
+    manifest["request"] = req.model_dump()
+    storage.save_manifest(manifest)
+
+    curate_req = CurateRequest(
+        source_type=req.source_type,
+        hf_dataset=req.hf_dataset,
+        hf_config=req.hf_config,
+        hf_split=req.hf_split,
+    )
+    manifest = run_curate(run_id, curate_req)["manifest"]
+    manifest = run_design(run_id, req.prompt, req.doc_type, llm)["manifest"]
+    manifest = run_synthesize(run_id, req.num_docs, req.seed, llm)["manifest"]
+    return manifest

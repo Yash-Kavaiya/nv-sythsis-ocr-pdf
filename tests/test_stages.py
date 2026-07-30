@@ -84,3 +84,17 @@ def test_synthesize_after_design(client, tmp_path):
     assert (tmp_path / "runs" / run_id / "reports" / "pdf.json").exists()
     synth_report = json.loads((tmp_path / "runs" / run_id / "reports" / "synthesizer.json").read_text())
     assert "privacy_safe" in synth_report
+
+
+def test_pipeline_run_still_works(client, tmp_path):
+    r = client.post("/api/pipeline/run", json={
+        "source_type": "empty",
+        "prompt": "short test invoices",
+        "num_docs": 1,
+        "seed": 42,
+    })
+    assert r.status_code == 200
+    m = r.json()
+    assert m["docs"]
+    assert m["stage_status"]["synthesizer"] == "done"
+    assert (tmp_path / "runs" / m["run_id"] / "schema.json").exists()

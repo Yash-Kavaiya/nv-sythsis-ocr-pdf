@@ -18,11 +18,10 @@ from fastapi.staticfiles import StaticFiles
 from . import storage
 from .evals.metrics import aggregate
 from .evals.runner import resolve_model_config, run_eval
-from .latex.harness import generate_tex
 from .models import CreateRunRequest, CurateRequest, DesignRequest, EvalRequest, PipelineRequest, StageErrorBody, SynthesizeRequest
 from .pipeline import stages
-from .pdfgen.compiler import create_pdf, find_latex_engine, pdf_to_png
-from .pipeline import curator, designer, hf_loader, synthesizer
+from .pdfgen.compiler import find_latex_engine
+from .pipeline import hf_loader
 from .pipeline.llm import LLMClient
 
 app = FastAPI(title="NV Synthetic OCR PDF Studio", version="1.0.0")
@@ -64,81 +63,11 @@ def sample_preview():
 
 @app.post("/api/pipeline/run")
 def pipeline_run(req: PipelineRequest):
-    llm = LLMClient()
-    stages = []
-
-    # 1. Seed acquisition
-    if req.source_type == "huggingface":
-        if not req.hf_dataset:
-            raise HTTPException(status_code=422, detail="hf_dataset is required for huggingface source")
-        try:
-            seed_records = hf_loader.load_hf_rows(req.hf_dataset, req.hf_config, req.hf_split, limit=50)
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=f"HuggingFace load failed: {exc}")
-        stages.append({"stage": "seed", "detail": {"source": req.hf_dataset, "rows": len(seed_records)}})
-    elif req.source_type == "sample":
-        seed_records = hf_loader.load_sample_seed()
-        stages.append({"stage": "seed", "detail": {"source": "bundled sample corpus", "rows": len(seed_records)}})
-    else:
-        seed_records = []
-        stages.append({"stage": "seed", "detail": {"source": "empty (prompt only)", "rows": 0}})
-
-    # 2. NeMo Curator
-    curated, curator_report = curator.curate(seed_records)
-    stages.append({"stage": "curator", "detail": curator_report})
-
-    # 3. NeMo Data Designer
-    stats = curator.seed_stats(curated)
-    schema, design_report = designer.design_schema(req.prompt, stats, llm, req.doc_type)
-    stages.append({"stage": "designer", "detail": design_report})
-
-    # 4. NeMo Synthesizer -> JSON ground truth
-    records, synth_report = synthesizer.synthesize(schema, req.num_docs, llm, req.seed)
-    stages.append({"stage": "synthesizer", "detail": synth_report})
-
-    # 5. LaTeX agent harness + 6. PDF
-    run_id = storage.new_id("run")
-    rdir = storage.run_dir(run_id)
-    rdir.mkdir(parents=True, exist_ok=True)
-
-    docs = []
-    engines = set()
-    for i, record in enumerate(records):
-        (rdir / f"doc_{i}.json").write_text(json.dumps(record, indent=2, default=str))
-        tex, attempts = generate_tex(record, schema, llm)
-        (rdir / f"doc_{i}.tex").write_text(tex)
-        pdf_path = rdir / f"doc_{i}.pdf"
-        engine = create_pdf(tex, schema["doc_type"], record, schema.get("currency", "$"), str(pdf_path))
-        engines.add(engine)
-        png_path = rdir / f"doc_{i}.png"
-        has_png = pdf_to_png(str(pdf_path), str(png_path))
-        docs.append({
-            "index": i,
-            "json_path": f"/api/runs/{run_id}/docs/{i}/json",
-            "tex_path": f"/api/runs/{run_id}/docs/{i}/tex",
-            "pdf_path": f"/api/runs/{run_id}/docs/{i}/pdf",
-            "png_path": f"/api/runs/{run_id}/docs/{i}/png" if has_png else None,
-            "harness_attempts": attempts,
-            "pdf_engine": engine,
-        })
-    stages.append({"stage": "latex_harness", "detail": {
-        "template": f"{schema['doc_type']}.tex.j2",
-        "docs": len(docs),
-        "repair_attempts": sum(d["harness_attempts"] - 1 for d in docs),
-    }})
-    stages.append({"stage": "pdf", "detail": {"engine": ", ".join(sorted(engines)), "docs": len(docs)}})
-
-    manifest = {
-        "run_id": run_id,
-        "created_at": storage.now_iso(),
-        "request": req.model_dump(),
-        "schema": schema,
-        "stages": stages,
-        "docs": docs,
-        "llm_backed": bool(design_report.get("llm_backed") or synth_report.get("llm_backed")),
-    }
-    storage.save_manifest(manifest)
-    return manifest
+    try:
+        return stages.run_pipeline_all(req, LLMClient())
+    except stages.StageFailure as exc:
+        body = StageErrorBody(stage=exc.stage, error=exc.error, hint=exc.hint)
+        return JSONResponse(status_code=exc.http_status, content=body.model_dump())
 
 
 # ---------------------------------------------------------------- runs & artifacts
