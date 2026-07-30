@@ -3,6 +3,7 @@ __pycache__/
 /data/
 .env
 node_modules/
+frontend/dist/
 nohup.out
 *.log
 

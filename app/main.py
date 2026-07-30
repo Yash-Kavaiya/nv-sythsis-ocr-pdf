@@ -26,7 +26,8 @@ from .pipeline import hf_loader
 from .pipeline.llm import LLMClient
 
 app = FastAPI(title="NV Synthetic OCR PDF Studio", version="1.0.0")
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+LEGACY_STATIC = Path(__file__).resolve().parent.parent / "static"
 
 
 # ---------------------------------------------------------------- health
@@ -226,4 +227,8 @@ def eval_get(eval_id: str):
 
 # ---------------------------------------------------------------- static site
 
-app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+if FRONTEND_DIST.exists():
+    app.mount("/legacy", StaticFiles(directory=str(LEGACY_STATIC), html=True), name="legacy")
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="spa")
+else:
+    app.mount("/", StaticFiles(directory=str(LEGACY_STATIC), html=True), name="static")
