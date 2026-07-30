@@ -10,6 +10,21 @@ SourceType = Literal["huggingface", "sample", "empty"]
 DocType = Literal["invoice", "receipt", "letter", "form"]
 
 
+class CreateRunRequest(BaseModel):
+    prompt: str = ""
+    source_type: SourceType = "empty"
+    hf_dataset: Optional[str] = None
+    hf_config: Optional[str] = None
+    hf_split: str = "train"
+
+
+class StageErrorBody(BaseModel):
+    ok: bool = False
+    stage: str
+    error: str
+    hint: str = ""
+
+
 class PipelineRequest(BaseModel):
     source_type: SourceType = "empty"
     hf_dataset: Optional[str] = None

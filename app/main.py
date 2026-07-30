@@ -19,7 +19,8 @@ from . import storage
 from .evals.metrics import aggregate
 from .evals.runner import resolve_model_config, run_eval
 from .latex.harness import generate_tex
-from .models import EvalRequest, PipelineRequest
+from .models import CreateRunRequest, EvalRequest, PipelineRequest
+from .pipeline import stages
 from .pdfgen.compiler import create_pdf, find_latex_engine, pdf_to_png
 from .pipeline import curator, designer, hf_loader, synthesizer
 from .pipeline.llm import LLMClient
@@ -141,6 +142,14 @@ def pipeline_run(req: PipelineRequest):
 
 
 # ---------------------------------------------------------------- runs & artifacts
+
+@app.post("/api/runs")
+def runs_create(req: CreateRunRequest):
+    manifest = stages.create_run(req.prompt, req.source_type)
+    manifest["request"] = req.model_dump()
+    storage.save_manifest(manifest)
+    return manifest
+
 
 @app.get("/api/runs")
 def runs_list():
