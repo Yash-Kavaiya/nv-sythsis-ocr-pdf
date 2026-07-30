@@ -1,6 +1,7 @@
 """Stage status helpers and run creation for the NeMo E2E wizard."""
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from .. import storage
@@ -150,6 +151,14 @@ def run_curate(run_id: str, req: CurateRequest) -> dict[str, Any]:
                 "curator",
                 f"Sample corpus not found: {exc}",
                 hint="Ensure app/data/sample_seed.json exists.",
+                http_status=502,
+            )
+        except json.JSONDecodeError as exc:
+            _fail_stage(
+                manifest,
+                "curator",
+                f"Sample corpus is invalid JSON: {exc}",
+                hint="Repair app/data/sample_seed.json.",
                 http_status=502,
             )
         seed_detail = {"source": "bundled sample corpus", "rows": len(seed_records)}
