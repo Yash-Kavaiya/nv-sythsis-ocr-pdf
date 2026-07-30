@@ -57,3 +57,16 @@ def test_nemo_claw_provider_stub():
     provider = NemoClawProvider()
     with pytest.raises(NotImplementedError, match="OpenShell"):
         provider.chat("run_x", "hi", [])
+
+
+def test_run_stage_tool_updates_manifest_request(client):
+    run_id = client.post("/api/runs", json={"prompt": "invoices", "source_type": "empty"}).json()["run_id"]
+    from app.claw.tools import execute_tool
+
+    client.post(f"/api/runs/{run_id}/curate", json={"source_type": "empty"})
+    client.post(f"/api/runs/{run_id}/design", json={"prompt": "retail invoices USD"})
+    out = execute_tool("run_stage", {"stage": "synthesize", "num_docs": 2, "seed": 7}, run_id)
+    assert out["ok"] is True
+    m = client.get(f"/api/runs/{run_id}").json()
+    assert m["request"]["num_docs"] == 2
+    assert m["request"]["seed"] == 7

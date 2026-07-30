@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, clawChat } from "../api/client";
+import { useRun } from "../state/runStore";
 
 type ToolCall = {
   tool?: string;
@@ -25,7 +26,10 @@ type ClawRailProps = {
   onActivity?: (entry: { type: string; detail: string }) => void;
 };
 
+const MUTATING_TOOLS = new Set(["run_stage", "run_pipeline"]);
+
 export default function ClawRail({ runId, compact = true, onActivity }: ClawRailProps) {
+  const { refresh } = useRun();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -59,6 +63,20 @@ export default function ClawRail({ runId, compact = true, onActivity }: ClawRail
         });
       }
       onActivity?.({ type: "reply", detail: result.reply });
+
+      if (toolCalls.some((tc) => MUTATING_TOOLS.has(tc.tool ?? ""))) {
+        try {
+          await refresh();
+        } catch (refreshErr) {
+          const refreshMsg =
+            refreshErr instanceof ApiError
+              ? refreshErr.message
+              : refreshErr instanceof Error
+                ? refreshErr.message
+                : "Failed to refresh run";
+          setError(`Chat ok, but refresh failed: ${refreshMsg}`);
+        }
+      }
     } catch (err) {
       const msg =
         err instanceof ApiError

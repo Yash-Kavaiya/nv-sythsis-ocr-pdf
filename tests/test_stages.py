@@ -95,6 +95,23 @@ def test_recurate_marks_designer_stale(client):
     assert m["stage_status"]["designer"] == "stale"
 
 
+def test_stage_posts_update_manifest_request(client):
+    run_id = client.post("/api/runs", json={"prompt": "old prompt", "source_type": "empty"}).json()["run_id"]
+    client.post(f"/api/runs/{run_id}/curate", json={"source_type": "sample"})
+    m = client.get(f"/api/runs/{run_id}").json()
+    assert m["request"]["source_type"] == "sample"
+
+    client.post(f"/api/runs/{run_id}/design", json={"prompt": "simple retail invoices USD"})
+    m = client.get(f"/api/runs/{run_id}").json()
+    assert m["request"]["prompt"] == "simple retail invoices USD"
+
+    client.post(f"/api/runs/{run_id}/synthesize", json={"num_docs": 2, "seed": 99, "privacy_safe": False})
+    m = client.get(f"/api/runs/{run_id}").json()
+    assert m["request"]["num_docs"] == 2
+    assert m["request"]["seed"] == 99
+    assert m["request"]["privacy_safe"] is False
+
+
 def test_pipeline_run_still_works(client, tmp_path):
     r = client.post("/api/pipeline/run", json={
         "source_type": "empty",

@@ -105,6 +105,12 @@ def create_run(prompt: str = "", source_type: str = "empty") -> dict[str, Any]:
     return manifest
 
 
+def _merge_request(manifest: dict[str, Any], **fields: Any) -> None:
+    request = dict(manifest.get("request", {}))
+    request.update(fields)
+    manifest["request"] = request
+
+
 def _mark_done_downstream_stale(manifest: dict[str, Any], from_stage: str) -> dict[str, Any]:
     targets = _DOWNSTREAM_STALE.get(from_stage, [])
     stage_status = dict(manifest.get("stage_status", {}))
@@ -186,6 +192,13 @@ def run_curate(run_id: str, req: CurateRequest) -> dict[str, Any]:
     storage.write_run_json(run_id, "reports/curator.json", curator_report)
 
     _append_stage_report(manifest, "seed", seed_detail)
+    _merge_request(
+        manifest,
+        source_type=req.source_type,
+        hf_dataset=req.hf_dataset,
+        hf_config=req.hf_config,
+        hf_split=req.hf_split,
+    )
     manifest = set_stage_status(manifest, "curator", "done", detail=curator_report)
     storage.save_manifest(manifest)
     return {"ok": True, "manifest": manifest}
@@ -245,6 +258,9 @@ def run_design(run_id: str, prompt: str, doc_type: str | None, llm: LLMClient) -
     if design_report.get("llm_backed"):
         manifest["llm_backed"] = True
 
+    _merge_request(manifest, prompt=prompt)
+    if doc_type is not None:
+        _merge_request(manifest, doc_type=doc_type)
     manifest = set_stage_status(manifest, "designer", "done", detail=design_report)
     storage.save_manifest(manifest)
     return {"ok": True, "manifest": manifest}
@@ -359,6 +375,7 @@ def run_synthesize(
     if synth_report.get("llm_backed"):
         manifest["llm_backed"] = True
 
+    _merge_request(manifest, num_docs=num_docs, seed=seed, privacy_safe=privacy_safe)
     manifest = set_stage_status(manifest, "synthesizer", "done", detail=synth_report)
     storage.save_manifest(manifest)
     return {"ok": True, "manifest": manifest}
