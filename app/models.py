@@ -125,6 +125,11 @@ class DocEval(BaseModel):
     prediction: dict[str, Any] = {}
 
 
+class ClawChatRequest(BaseModel):
+    run_id: str
+    message: str = Field(..., min_length=1)
+
+
 class EvalResult(BaseModel):
     eval_id: str
     run_id: str

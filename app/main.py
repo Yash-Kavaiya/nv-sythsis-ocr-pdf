@@ -18,7 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from . import storage
 from .evals.metrics import aggregate
 from .evals.runner import resolve_model_config, run_eval
-from .models import CreateRunRequest, CurateRequest, DesignRequest, EvalRequest, PipelineRequest, StageErrorBody, SynthesizeRequest
+from .claw.chat import handle_claw_chat
+from .models import ClawChatRequest, CreateRunRequest, CurateRequest, DesignRequest, EvalRequest, PipelineRequest, StageErrorBody, SynthesizeRequest
 from .pipeline import stages
 from .pdfgen.compiler import find_latex_engine
 from .pipeline import hf_loader
@@ -162,6 +163,17 @@ def doc_artifact(run_id: str, index: int, kind: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="artifact not found")
     return FileResponse(path, media_type=media, filename=path.name)
+
+
+# ---------------------------------------------------------------- claw
+
+@app.post("/api/claw/chat")
+def claw_chat(req: ClawChatRequest):
+    try:
+        storage.load_manifest(req.run_id)
+    except (FileNotFoundError, ValueError):
+        raise HTTPException(status_code=404, detail="run not found")
+    return handle_claw_chat(req.run_id, req.message)
 
 
 # ---------------------------------------------------------------- evals

@@ -108,6 +108,19 @@ def load_eval(eval_id: str) -> dict[str, Any]:
     return json.loads(path.read_text())
 
 
+def load_claw_messages(run_id: str) -> list[dict[str, Any]]:
+    path = _safe_run_path(run_id, "claw/messages.json")
+    if not path.exists():
+        return []
+    return json.loads(path.read_text())
+
+
+def save_claw_messages(run_id: str, messages: list[dict[str, Any]]) -> None:
+    path = _safe_run_path(run_id, "claw/messages.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(messages, indent=2, default=str))
+
+
 def list_evals() -> list[dict[str, Any]]:
     out = []
     if EVALS_DIR.exists():
