@@ -3,6 +3,7 @@ import { ApiError, createRun } from "./api/client";
 import Stepper from "./components/Stepper";
 import CuratorPage from "./pages/CuratorPage";
 import DesignerPage from "./pages/DesignerPage";
+import SynthesizerPage from "./pages/SynthesizerPage";
 import { useRun } from "./state/runStore";
 
 function StageContent({ step }: { step: number }) {
@@ -11,6 +12,8 @@ function StageContent({ step }: { step: number }) {
       return <CuratorPage />;
     case 1:
       return <DesignerPage />;
+    case 2:
+      return <SynthesizerPage />;
     default:
       return (
         <p className="subtitle">Stage {step + 1} — coming soon.</p>

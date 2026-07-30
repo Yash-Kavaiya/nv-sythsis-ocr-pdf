@@ -436,6 +436,96 @@ button.block {
   font-size: 12px;
 }
 
+/* ---------- doc gallery ---------- */
+.docs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-4);
+}
+
+.doc-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.doc-card .thumb {
+  width: 100%;
+  aspect-ratio: 3/4;
+  object-fit: contain;
+  object-position: top;
+  background: #fff;
+  display: block;
+  border-bottom: 1px solid var(--border);
+}
+
+.doc-card .meta {
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.doc-card .links {
+  padding: 0 10px 10px;
+  display: flex;
+  gap: var(--space-3);
+  font-size: 12px;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  text-decoration: none;
+}
+
+.download-link {
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+
+.stale-banner {
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  border: 1px solid var(--warning);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-bottom: var(--space-4);
+  font-size: 13px;
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: var(--space-2);
+  text-transform: none;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  width: auto;
+}
+
+.empty {
+  color: var(--text-muted);
+  text-align: center;
+  padding: var(--space-8) 0;
+}
+
+a {
+  color: var(--series-1);
+}
+
 /* ---------- misc ---------- */
 .error-box {
   background: color-mix(in srgb, var(--critical) 10%, transparent);
