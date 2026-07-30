@@ -19,7 +19,7 @@ from . import storage
 from .evals.metrics import aggregate
 from .evals.runner import resolve_model_config, run_eval
 from .latex.harness import generate_tex
-from .models import CreateRunRequest, EvalRequest, PipelineRequest
+from .models import CreateRunRequest, CurateRequest, EvalRequest, PipelineRequest, StageErrorBody
 from .pipeline import stages
 from .pdfgen.compiler import create_pdf, find_latex_engine, pdf_to_png
 from .pipeline import curator, designer, hf_loader, synthesizer
@@ -149,6 +149,17 @@ def runs_create(req: CreateRunRequest):
     manifest["request"] = req.model_dump()
     storage.save_manifest(manifest)
     return manifest
+
+
+@app.post("/api/runs/{run_id}/curate")
+def runs_curate(run_id: str, req: CurateRequest):
+    try:
+        return stages.run_curate(run_id, req)
+    except stages.RunNotFoundError:
+        raise HTTPException(status_code=404, detail="run not found")
+    except stages.StageFailure as exc:
+        body = StageErrorBody(stage=exc.stage, error=exc.error, hint=exc.hint)
+        return JSONResponse(status_code=exc.http_status, content=body.model_dump())
 
 
 @app.get("/api/runs")

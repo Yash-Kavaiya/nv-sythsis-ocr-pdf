@@ -18,6 +18,13 @@ class CreateRunRequest(BaseModel):
     hf_split: str = "train"
 
 
+class CurateRequest(BaseModel):
+    source_type: SourceType = "empty"
+    hf_dataset: Optional[str] = None
+    hf_config: Optional[str] = None
+    hf_split: str = "train"
+
+
 class StageErrorBody(BaseModel):
     ok: bool = False
     stage: str
