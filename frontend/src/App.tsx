@@ -4,6 +4,8 @@ import Stepper from "./components/Stepper";
 import CuratorPage from "./pages/CuratorPage";
 import DesignerPage from "./pages/DesignerPage";
 import SynthesizerPage from "./pages/SynthesizerPage";
+import ClawPage from "./pages/ClawPage";
+import ClawRail from "./components/ClawRail";
 import { useRun } from "./state/runStore";
 
 function StageContent({ step }: { step: number }) {
@@ -14,6 +16,8 @@ function StageContent({ step }: { step: number }) {
       return <DesignerPage />;
     case 2:
       return <SynthesizerPage />;
+    case 3:
+      return <ClawPage />;
     default:
       return (
         <p className="subtitle">Stage {step + 1} — coming soon.</p>
@@ -64,16 +68,19 @@ export default function App() {
 
       <Stepper />
 
-      <main>
-        {error ? <div className="error-box">{error}</div> : null}
-        {manifest?.stage_error ? (
-          <div className="error-box" role="alert">
-            {manifest.stage_error.stage}: {manifest.stage_error.error}
-            {manifest.stage_error.hint ? ` — ${manifest.stage_error.hint}` : ""}
-          </div>
-        ) : null}
-        <StageContent step={step} />
-      </main>
+      <div className="app-body">
+        <main>
+          {error ? <div className="error-box">{error}</div> : null}
+          {manifest?.stage_error ? (
+            <div className="error-box" role="alert">
+              {manifest.stage_error.stage}: {manifest.stage_error.error}
+              {manifest.stage_error.hint ? ` — ${manifest.stage_error.hint}` : ""}
+            </div>
+          ) : null}
+          <StageContent step={step} />
+        </main>
+        {runId && step !== 3 ? <ClawRail runId={runId} /> : null}
+      </div>
     </>
   );
 }
