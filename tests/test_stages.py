@@ -86,6 +86,15 @@ def test_synthesize_after_design(client, tmp_path):
     assert "privacy_safe" in synth_report
 
 
+def test_recurate_marks_designer_stale(client):
+    run_id = client.post("/api/runs", json={"prompt": "invoices"}).json()["run_id"]
+    client.post(f"/api/runs/{run_id}/curate", json={"source_type": "empty"})
+    client.post(f"/api/runs/{run_id}/design", json={"prompt": "pharmacy invoices rupees"})
+    client.post(f"/api/runs/{run_id}/curate", json={"source_type": "empty"})
+    m = client.get(f"/api/runs/{run_id}").json()
+    assert m["stage_status"]["designer"] == "stale"
+
+
 def test_pipeline_run_still_works(client, tmp_path):
     r = client.post("/api/pipeline/run", json={
         "source_type": "empty",

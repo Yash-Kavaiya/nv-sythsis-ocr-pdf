@@ -12,6 +12,7 @@ export default function DesignerPage() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isStale = manifest?.stage_status?.designer === "stale";
   const schemaJson = manifest?.schema
     ? JSON.stringify(manifest.schema, null, 2)
     : "";
@@ -55,6 +56,12 @@ export default function DesignerPage() {
       <p className="subtitle">
         Define the document schema from your prompt. Re-run design to refresh the schema.
       </p>
+
+      {isStale ? (
+        <div className="stale-banner" role="status">
+          Upstream curator changed — re-run design to refresh the schema.
+        </div>
+      ) : null}
 
       {!runId ? (
         <div className="error-box">Create a run and complete Curator to use the Data Designer.</div>
