@@ -1,20 +1,10 @@
 import { useState } from "react";
-
-const STEPS = [
-  "Curator",
-  "Data Designer",
-  "Safe Synthesizer",
-  "Claw",
-  "Evaluator",
-] as const;
-
-type CreateRunResponse = {
-  run_id: string;
-};
+import { ApiError, createRun } from "./api/client";
+import Stepper from "./components/Stepper";
+import { useRun } from "./state/runStore";
 
 export default function App() {
-  const [activeStep, setActiveStep] = useState(0);
-  const [runId, setRunId] = useState<string | null>(null);
+  const { runId, manifest, setManifest, setStep } = useRun();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,19 +12,20 @@ export default function App() {
     setCreating(true);
     setError(null);
     try {
-      const res = await fetch("/api/runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: "", source_type: "empty" }),
-      });
-      if (!res.ok) {
-        throw new Error(`Create run failed (${res.status})`);
+      const manifest = await createRun({ prompt: "", source_type: "empty" });
+      if (!manifest.run_id) {
+        throw new Error("Create run returned no run_id");
       }
-      const data = (await res.json()) as CreateRunResponse;
-      setRunId(data.run_id);
-      setActiveStep(0);
+      setManifest(manifest);
+      setStep(0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Create run failed");
+      if (err instanceof ApiError) {
+        const parts = [err.message];
+        if (err.hint) parts.push(err.hint);
+        setError(parts.join(" — "));
+      } else {
+        setError(err instanceof Error ? err.message : "Create run failed");
+      }
     } finally {
       setCreating(false);
     }
@@ -53,19 +44,7 @@ export default function App() {
         {runId ? <span className="run-id">Run: {runId}</span> : null}
       </header>
 
-      <nav className="stepper" aria-label="Pipeline stages">
-        {STEPS.map((label, index) => (
-          <button
-            key={label}
-            type="button"
-            className={`stage${index === activeStep ? " active" : ""}`}
-            onClick={() => setActiveStep(index)}
-          >
-            <span className="name">{label}</span>
-            <span className="status">Pending</span>
-          </button>
-        ))}
-      </nav>
+      <Stepper />
 
       <main>
         {error ? <div className="error-box">{error}</div> : null}
@@ -74,6 +53,12 @@ export default function App() {
             ? `Run ${runId} — select a stage above to begin.`
             : "Create a run to start the wizard."}
         </p>
+        {manifest?.stage_error ? (
+          <div className="error-box" role="alert">
+            {manifest.stage_error.stage}: {manifest.stage_error.error}
+            {manifest.stage_error.hint ? ` — ${manifest.stage_error.hint}` : ""}
+          </div>
+        ) : null}
       </main>
     </>
   );

@@ -229,6 +229,13 @@ header {
   color: var(--text-primary);
 }
 
+.stage.locked,
+.stage:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* ---------- main ---------- */
 main {
   max-width: 1240px;
