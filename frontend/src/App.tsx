@@ -2,12 +2,15 @@ import { useState } from "react";
 import { ApiError, createRun } from "./api/client";
 import Stepper from "./components/Stepper";
 import CuratorPage from "./pages/CuratorPage";
+import DesignerPage from "./pages/DesignerPage";
 import { useRun } from "./state/runStore";
 
 function StageContent({ step }: { step: number }) {
   switch (step) {
     case 0:
       return <CuratorPage />;
+    case 1:
+      return <DesignerPage />;
     default:
       return (
         <p className="subtitle">Stage {step + 1} — coming soon.</p>

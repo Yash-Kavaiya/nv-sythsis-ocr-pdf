@@ -430,6 +430,12 @@ button.block {
   word-break: break-word;
 }
 
+.schema-view {
+  min-height: 240px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
 /* ---------- misc ---------- */
 .error-box {
   background: color-mix(in srgb, var(--critical) 10%, transparent);
