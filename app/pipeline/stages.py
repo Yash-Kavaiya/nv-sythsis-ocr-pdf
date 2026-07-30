@@ -5,8 +5,10 @@ import json
 from typing import Any
 
 from .. import storage
+from ..latex.harness import generate_tex
 from ..models import CurateRequest
-from . import curator, designer, hf_loader
+from ..pdfgen.compiler import create_pdf, pdf_to_png
+from . import curator, designer, hf_loader, synthesizer
 from .llm import LLMClient
 
 STAGE_ORDER = ["curator", "designer", "synthesizer", "claw", "evaluator"]
@@ -244,5 +246,119 @@ def run_design(run_id: str, prompt: str, doc_type: str | None, llm: LLMClient) -
         manifest["llm_backed"] = True
 
     manifest = set_stage_status(manifest, "designer", "done", detail=design_report)
+    storage.save_manifest(manifest)
+    return {"ok": True, "manifest": manifest}
+
+
+def run_synthesize(
+    run_id: str,
+    num_docs: int,
+    seed: int | None,
+    llm: LLMClient,
+    privacy_safe: bool = True,
+) -> dict[str, Any]:
+    try:
+        manifest = storage.load_manifest(run_id)
+    except (FileNotFoundError, ValueError):
+        raise RunNotFoundError(run_id)
+
+    designer_status = manifest.get("stage_status", {}).get("designer", "idle")
+    if designer_status != "done":
+        try:
+            storage.read_run_json(run_id, "schema.json")
+        except FileNotFoundError:
+            _fail_stage(
+                manifest,
+                "synthesizer",
+                "Designer must complete before synthesize",
+                hint="Run POST /api/runs/{id}/design first.",
+                http_status=400,
+            )
+
+    manifest = set_stage_status(manifest, "synthesizer", "running")
+    storage.save_manifest(manifest)
+
+    try:
+        schema = storage.read_run_json(run_id, "schema.json")
+    except FileNotFoundError:
+        _fail_stage(
+            manifest,
+            "synthesizer",
+            "schema.json not found",
+            hint="Run POST /api/runs/{id}/design first.",
+            http_status=400,
+        )
+
+    try:
+        records, synth_report = synthesizer.synthesize(schema, num_docs, llm, seed)
+    except Exception as exc:
+        _fail_stage(
+            manifest,
+            "synthesizer",
+            str(exc),
+            hint="Retry synthesize, or set NVIDIA_API_KEY for NIM; offline Faker synthesis is available.",
+            http_status=502,
+        )
+
+    synth_report["privacy_safe"] = privacy_safe
+    storage.write_run_json(run_id, "reports/synthesizer.json", synth_report)
+
+    rdir = storage.run_dir(run_id)
+    docs = []
+    engines: set[str] = set()
+    for i, record in enumerate(records):
+        storage.write_run_json(run_id, f"doc_{i}.json", record)
+        try:
+            tex, attempts = generate_tex(record, schema, llm)
+        except Exception as exc:
+            _fail_stage(
+                manifest,
+                "synthesizer",
+                f"LaTeX harness failed for doc {i}: {exc}",
+                hint="Retry synthesize or check LaTeX template.",
+                http_status=502,
+            )
+        (rdir / f"doc_{i}.tex").write_text(tex)
+        pdf_path = rdir / f"doc_{i}.pdf"
+        try:
+            engine = create_pdf(
+                tex, schema["doc_type"], record, schema.get("currency", "$"), str(pdf_path)
+            )
+        except Exception as exc:
+            _fail_stage(
+                manifest,
+                "synthesizer",
+                f"PDF generation failed for doc {i}: {exc}",
+                hint="Ensure a LaTeX engine is installed or fpdf2 fallback is available.",
+                http_status=502,
+            )
+        engines.add(engine)
+        png_path = rdir / f"doc_{i}.png"
+        has_png = pdf_to_png(str(pdf_path), str(png_path))
+        docs.append({
+            "index": i,
+            "json_path": f"/api/runs/{run_id}/docs/{i}/json",
+            "tex_path": f"/api/runs/{run_id}/docs/{i}/tex",
+            "pdf_path": f"/api/runs/{run_id}/docs/{i}/pdf",
+            "png_path": f"/api/runs/{run_id}/docs/{i}/png" if has_png else None,
+            "harness_attempts": attempts,
+            "pdf_engine": engine,
+        })
+
+    latex_detail = {
+        "template": f"{schema['doc_type']}.tex.j2",
+        "docs": len(docs),
+        "repair_attempts": sum(d["harness_attempts"] - 1 for d in docs),
+    }
+    pdf_detail = {"engine": ", ".join(sorted(engines)), "docs": len(docs)}
+    storage.write_run_json(run_id, "reports/pdf.json", pdf_detail)
+    _append_stage_report(manifest, "latex_harness", latex_detail)
+    _append_stage_report(manifest, "pdf", pdf_detail)
+
+    manifest["docs"] = docs
+    if synth_report.get("llm_backed"):
+        manifest["llm_backed"] = True
+
+    manifest = set_stage_status(manifest, "synthesizer", "done", detail=synth_report)
     storage.save_manifest(manifest)
     return {"ok": True, "manifest": manifest}

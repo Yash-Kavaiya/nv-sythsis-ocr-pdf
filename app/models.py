@@ -30,6 +30,12 @@ class DesignRequest(BaseModel):
     doc_type: Optional[DocType] = None
 
 
+class SynthesizeRequest(BaseModel):
+    num_docs: int = Field(5, ge=1, le=50)
+    seed: Optional[int] = None
+    privacy_safe: bool = True
+
+
 class StageErrorBody(BaseModel):
     ok: bool = False
     stage: str

@@ -1,4 +1,5 @@
 # tests/test_stages.py
+import json
 import os
 from pathlib import Path
 
@@ -57,3 +58,29 @@ def test_design_after_curate(client, tmp_path):
     assert r.status_code == 200
     assert r.json()["manifest"]["stage_status"]["designer"] == "done"
     assert (tmp_path / "runs" / run_id / "schema.json").exists()
+
+
+def test_synthesize_requires_design(client):
+    run_id = client.post("/api/runs", json={"prompt": "invoices"}).json()["run_id"]
+    client.post(f"/api/runs/{run_id}/curate", json={"source_type": "empty"})
+    r = client.post(f"/api/runs/{run_id}/synthesize", json={"num_docs": 2, "seed": 1})
+    assert r.status_code == 400
+    body = r.json()
+    assert body["stage"] == "synthesizer"
+
+
+def test_synthesize_after_design(client, tmp_path):
+    run_id = client.post("/api/runs", json={"prompt": "invoices"}).json()["run_id"]
+    client.post(f"/api/runs/{run_id}/curate", json={"source_type": "empty"})
+    client.post(f"/api/runs/{run_id}/design", json={"prompt": "simple retail invoices USD"})
+    r = client.post(f"/api/runs/{run_id}/synthesize", json={"num_docs": 2, "seed": 1})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["manifest"]["stage_status"]["synthesizer"] == "done"
+    assert len(body["manifest"]["docs"]) == 2
+    assert (tmp_path / "runs" / run_id / "doc_0.json").exists()
+    assert (tmp_path / "runs" / run_id / "doc_0.pdf").exists()
+    assert (tmp_path / "runs" / run_id / "reports" / "synthesizer.json").exists()
+    assert (tmp_path / "runs" / run_id / "reports" / "pdf.json").exists()
+    synth_report = json.loads((tmp_path / "runs" / run_id / "reports" / "synthesizer.json").read_text())
+    assert "privacy_safe" in synth_report
