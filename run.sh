@@ -6,7 +6,11 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-PORT="${PORT:-8000}"
+# Force UTF-8: the real data-designer package logs emoji via `rich`, which
+# crashes on Windows cp1252 consoles; uvicorn also benefits from it.
+export PYTHONUTF8=1
+
+export PORT="${PORT:-8000}"
 
 # .env is optional (and gitignored): KEY=value lines, exported into the app's
 # environment. The app itself only reads os.environ, so sourcing is enough.

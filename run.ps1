@@ -5,6 +5,11 @@
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
+# Force UTF-8: the real data-designer package logs emoji via `rich`, which
+# crashes on Windows cp1252 consoles; uvicorn also benefits from it.
+$env:PYTHONUTF8 = '1'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 if (-not $env:PORT) { $env:PORT = '8000' }
 
 # .env is optional (and gitignored): KEY=value lines, loaded into the app's

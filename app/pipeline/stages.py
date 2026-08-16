@@ -8,7 +8,7 @@ from .. import storage
 from ..latex.harness import generate_tex
 from ..models import CurateRequest, PipelineRequest
 from ..pdfgen.compiler import create_pdf, pdf_to_png
-from . import curator, designer, hf_loader, synthesizer
+from . import curator, designer, data_designer_provider, hf_loader, providers, synthesizer
 from .llm import LLMClient
 
 STAGE_ORDER = ["curator", "designer", "synthesizer", "claw", "evaluator"]
@@ -177,8 +177,15 @@ def run_curate(run_id: str, req: CurateRequest) -> dict[str, Any]:
 
     storage.write_run_json(run_id, "seed.json", seed_records)
 
+    prompt = req.prompt or manifest.get("request", {}).get("prompt", "")
+    doc_type = req.doc_type or manifest.get("request", {}).get("doc_type")
+
     try:
-        curated, curator_report = curator.curate(seed_records)
+        curated, curator_report = curator.curate(
+            seed_records,
+            prompt=prompt,
+            doc_type=doc_type or "invoice",
+        )
     except Exception as exc:
         _fail_stage(
             manifest,
@@ -198,7 +205,10 @@ def run_curate(run_id: str, req: CurateRequest) -> dict[str, Any]:
         hf_dataset=req.hf_dataset,
         hf_config=req.hf_config,
         hf_split=req.hf_split,
+        prompt=prompt,
     )
+    if doc_type:
+        _merge_request(manifest, doc_type=doc_type)
     manifest = set_stage_status(manifest, "curator", "done", detail=curator_report)
     storage.save_manifest(manifest)
     return {"ok": True, "manifest": manifest}
@@ -241,7 +251,9 @@ def run_design(run_id: str, prompt: str, doc_type: str | None, llm: LLMClient) -
     stats = curator.seed_stats(curated)
 
     try:
-        schema, design_report = designer.design_schema(prompt, stats, llm, doc_type)
+        schema, design_report = designer.design_schema(
+            prompt, stats, llm, doc_type, curated_records=curated
+        )
     except Exception as exc:
         _fail_stage(
             manifest,
@@ -272,6 +284,7 @@ def run_synthesize(
     seed: int | None,
     llm: LLMClient,
     privacy_safe: bool = True,
+    generator: str = "auto",
 ) -> dict[str, Any]:
     try:
         manifest = storage.load_manifest(run_id)
@@ -305,16 +318,37 @@ def run_synthesize(
             http_status=400,
         )
 
-    try:
-        records, synth_report = synthesizer.synthesize(schema, num_docs, llm, seed)
-    except Exception as exc:
-        _fail_stage(
-            manifest,
-            "synthesizer",
-            str(exc),
-            hint="Retry synthesize, or set NVIDIA_API_KEY for NIM; offline Faker synthesis is available.",
-            http_status=502,
-        )
+    engine = providers.resolve("synthesizer", generator)
+    records: list[dict[str, Any]] = []
+    synth_report: dict[str, Any] = {}
+    nemo_report: dict[str, Any] = {}
+    if engine["provider"] == "nemo":
+        try:
+            nemo_records, nemo_report = data_designer_provider.generate_records(schema, num_docs, seed)
+        except Exception as exc:
+            nemo_report = {"provider": "nemo-data-designer", "error": f"{type(exc).__name__}: {str(exc)[:200]}"}
+            nemo_records = None
+        if nemo_records:
+            records = nemo_records
+            synth_report = dict(nemo_report)
+            synth_report["generator"] = engine["provider"]
+            synth_report["generator_reason"] = engine["reason"]
+
+    if not records:
+        try:
+            records, synth_report = synthesizer.synthesize(schema, num_docs, llm, seed)
+        except Exception as exc:
+            _fail_stage(
+                manifest,
+                "synthesizer",
+                str(exc),
+                hint="Retry synthesize, or set NVIDIA_API_KEY for NIM; offline Faker synthesis is available.",
+                http_status=502,
+            )
+        if nemo_report and nemo_report.get("error"):
+            synth_report["nemo_fallback_reason"] = nemo_report["error"]
+        synth_report["generator"] = "inapp"
+        synth_report["generator_reason"] = engine["reason"]
 
     synth_report["privacy_safe"] = privacy_safe
     storage.write_run_json(run_id, "reports/synthesizer.json", synth_report)
@@ -395,5 +429,5 @@ def run_pipeline_all(req: PipelineRequest, llm: LLMClient) -> dict[str, Any]:
     )
     manifest = run_curate(run_id, curate_req)["manifest"]
     manifest = run_design(run_id, req.prompt, req.doc_type, llm)["manifest"]
-    manifest = run_synthesize(run_id, req.num_docs, req.seed, llm)["manifest"]
+    manifest = run_synthesize(run_id, req.num_docs, req.seed, llm, generator="auto")["manifest"]
     return manifest

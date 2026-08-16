@@ -81,8 +81,10 @@ Everything works fully offline without a key; optional upgrades:
 
 | Env var | Effect |
 |---|---|
-| `NVIDIA_API_KEY` | Enables LLM-backed schema design, themed synthesis and LaTeX repair via [NVIDIA NIM](https://build.nvidia.com) (`integrate.api.nvidia.com`). Without it, a deterministic Faker-based synthesizer runs instead. |
-| `NVIDIA_MODEL` / `NVIDIA_BASE_URL` | Override the default model (`meta/llama-3.1-70b-instruct`) or endpoint. |
+| `NVIDIA_API_KEY` | Enables LLM-backed schema design, themed synthesis and LaTeX repair via [NVIDIA NIM](https://build.nvidia.com) (`integrate.api.nvidia.com`), and the real NeMo Data Designer engine. Without it, deterministic in-app engines run instead. |
+| `NVIDIA_MODEL` / `NVIDIA_BASE_URL` | Override the default model (`nvidia/nemotron-3-ultra-550b-a55b`) or endpoint. |
+| `OPENROUTER_API_KEY` / `SERP_API_KEY` | Optional: QROTAID web retrieval in the Curator (real-world document examples that ground schema design). Perplexity via OpenRouter first, Google SERP fallback. |
+| `NEMO_CURATOR` | Set to `1` (Linux + `pip install nemo-curator`) to route seed curation through the real NeMo Curator pipeline instead of the in-app curator. |
 | `DATA_DIR` | Where runs/evals are persisted (default `./data`). |
 | `PORT` | API port for `run.ps1` / `run.sh` (default `8000`). |
 | `DEV_FRONTEND` | Set to `1` to start Vite dev server alongside the API (see Quickstart). |
@@ -93,6 +95,28 @@ issues, commits, or chat logs. Rotate the key at
 
 If `tectonic` or `pdflatex` is installed, PDFs are compiled from the generated
 `.tex`; otherwise an equivalent pure-Python (fpdf2) renderer produces them.
+
+## Real NeMo engines (provider architecture)
+
+Every stage runs on an **in-app engine** (always available, offline) and can
+switch to a **real NVIDIA NeMo package** when the environment supports it. The
+engine for each stage is decided by `app/pipeline/providers.py` and shown in
+`GET /api/health` under `nemo_providers`.
+
+| Stage | In-app (default) | Real NeMo engine | When real is used |
+|---|---|---|---|
+| Curator | QROTAID: normalize, exact/near/semantic dedup, PII scrub, web retrieval | `nemo-curator` (GPU/Dask pipelines) | `NEMO_CURATOR=1` on Linux with the package installed |
+| Data Designer | LLM schema design + keyword inference | `data-designer` (column orchestration) | `data-designer` installed **and** `NVIDIA_API_KEY` set |
+| Safe Synthesizer | Faker/LLM generation with exact arithmetic | `data-designer` record generation (statistical samplers + LLM columns) | same as Data Designer; pick per-run with `generator` on `/synthesize` |
+| Evaluator | CER/WER, field accuracy, structure F1 + **run compare, quality gates, paired-flip regression** (NeMo Evaluator concepts ported) | `nel` (Nemo Evaluator, install from source) | when `nel` is importable |
+
+`POST /api/runs/{id}/synthesize` accepts `generator: "auto" | "inapp" | "nemo"`
+(default `auto` = real NeMo Data Designer when available, else in-app). Real
+engines never break a run: any failure falls back to the in-app engine with the
+reason recorded in the stage report.
+
+Optional installs live in [`requirements-optional.txt`](requirements-optional.txt)
+and every supported variable is documented in [`.env.example`](.env.example).
 
 ## How it works
 
@@ -115,8 +139,9 @@ etc.). Messages are persisted under `data/runs/<run_id>/claw/`.
 
 1. **Seed** — rows from a HuggingFace dataset (via the datasets-server API),
    the bundled sample corpus, or nothing (prompt only).
-2. **Curator** (NeMo-Curator-style) — unicode/whitespace normalization, exact +
-   near dedup, quality filter, PII scrub; emits a per-stage report.
+2. **Curator** (QROTAID) — unicode/whitespace normalization, exact + near +
+   semantic dedup, quality filter, PII scrub, plus optional web retrieval of
+   real-world examples that ground the Designer; emits a per-stage report.
 3. **Data Designer** — turns the prompt (+ seed stats) into a document schema:
    doc type (invoice / receipt / letter / form), theme, locale, currency, field
    list, item vocabulary. LLM-backed when a key is set, keyword inference otherwise.
@@ -152,6 +177,12 @@ Scoring against the ground-truth JSON:
 
 Results show as stat tiles, a per-document accuracy chart, and an expandable
 field-level diff table; evals are persisted and comparable across models.
+Beyond raw scores, the Evaluator ports the rigor of NeMo Evaluator (`nel`):
+**run comparison** with per-metric deltas and a paired sign test
+(`POST /api/evals/compare`), **quality gates** (GO / NO-GO from thresholds,
+`POST /api/evals/{id}/gate`), and a **model leaderboard**
+(`GET /api/leaderboard`) — so "the model (or dataset) improved" is a tested
+claim, not a vibe.
 
 ## API surface
 
@@ -171,6 +202,9 @@ GET  /api/runs/{id}/dataset                  download all ground-truth JSON
 GET  /api/runs/{id}/docs/{i}/{json|tex|pdf|png}
 POST /api/eval/run                           evaluate a model or uploaded predictions
 GET  /api/evals · /api/evals/{id}            list / fetch eval results
+GET  /api/leaderboard                        rank models by fuzzy field accuracy
+POST /api/evals/compare                      nel-style run comparison + paired sign test
+POST /api/evals/{id}/gate                    GO / NO-GO quality gate from thresholds
 ```
 
 ## Project layout
@@ -182,8 +216,12 @@ app/
   storage.py            run & eval persistence (filesystem)
   pipeline/
     stages.py           per-stage runners + manifest status helpers
+    providers.py        engine resolution per stage (in-app vs real NeMo)
+    data_designer_provider.py  real NeMo Data Designer record generation
+    nemo_curator_provider.py   real NeMo Curator seed curation (gated)
+    safe_synthesizer_provider.py  privacy report + DP upgrade tier (gated)
     hf_loader.py        HuggingFace datasets-server + sample corpus loading
-    curator.py          dedup / filter / normalize / PII scrub
+    curator.py          QROTAID: dedup / filter / normalize / PII scrub / web retrieval
     designer.py         prompt → document schema
     synthesizer.py      schema → ground-truth JSON records
     llm.py              OpenAI-compatible client (NVIDIA NIM)

@@ -23,6 +23,11 @@ class CurateRequest(BaseModel):
     hf_dataset: Optional[str] = None
     hf_config: Optional[str] = None
     hf_split: str = "train"
+    prompt: str = Field(
+        "",
+        description="Optional prompt; enables QROTAID web retrieval for relevant real-world examples",
+    )
+    doc_type: Optional[DocType] = None
 
 
 class DesignRequest(BaseModel):
@@ -34,6 +39,10 @@ class SynthesizeRequest(BaseModel):
     num_docs: int = Field(5, ge=1, le=50)
     seed: Optional[int] = None
     privacy_safe: bool = True
+    generator: str = Field(
+        "auto",
+        description='Engine for record generation: "auto" (real NeMo Data Designer when available, else in-app), "inapp", or "nemo"',
+    )
 
 
 class StageErrorBody(BaseModel):
@@ -41,6 +50,15 @@ class StageErrorBody(BaseModel):
     stage: str
     error: str
     hint: str = ""
+
+
+class CompareEvalsRequest(BaseModel):
+    eval_a: str
+    eval_b: str
+
+
+class QualityGateRequest(BaseModel):
+    thresholds: Optional[dict[str, float]] = None
 
 
 class PipelineRequest(BaseModel):

@@ -1,0 +1,28 @@
+# Optional real-NeMo integrations (not required for the default pipeline).
+#
+# The in-app implementations always work; install these to unlock the real
+# NVIDIA NeMo engines for each stage:
+#
+#   Synthesizer / Designer  -> real NeMo Data Designer (LLM orchestration;
+#                              needs an OpenAI-compatible endpoint key, e.g.
+#                              NVIDIA_API_KEY). Works on any OS.
+data-designer>=0.9.0
+
+#   Curator                 -> real NeMo Curator (scalable text/image curation;
+#                              Linux + GPU-oriented, Dask/RAPIDS). Enable with
+#                              NEMO_CURATOR=1 after installing.
+# nemo-curator>=1.0.0
+
+#   Evaluator               -> real Nemo Evaluator (`nel`) for LLM benchmarks;
+#                              install from source per
+#                              https://docs.nvidia.com/nemo/evaluator/get-started/install
+#                              The in-app evaluator already ports its compare /
+#                              quality-gate / regression concepts.
+# (no pip package — install from source)
+
+#   Safe Synthesizer        -> real NeMo Safe Synthesizer (DP fine-tuning;
+#                              Linux + A100-class GPU, distributed via NVIDIA
+#                              GPU images, not PyPI). In-app PII scrubbing +
+#                              fully synthetic generation stay active on every
+#                              run as the always-on safety layer.
+# (not on PyPI — NVIDIA GPU images / Brev)

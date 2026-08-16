@@ -112,6 +112,22 @@ def test_stage_posts_update_manifest_request(client):
     assert m["request"]["privacy_safe"] is False
 
 
+def test_curate_with_prompt_reports_qrotaid(client):
+    """The prompt is threaded into the Curator so the QROTAID report appears
+    (web retrieval is skipped offline, but the stage structure is present)."""
+    run_id = client.post("/api/runs", json={"prompt": "pharmacy invoices", "source_type": "empty"}).json()["run_id"]
+    r = client.post(
+        f"/api/runs/{run_id}/curate",
+        json={"source_type": "empty", "prompt": "pharmacy invoices from Indian retailers"},
+    )
+    assert r.status_code == 200
+    detail = r.json()["manifest"]["stages"]
+    curator_report = next(s["detail"] for s in detail if s["stage"] == "curator")
+    assert "qrotaid_stages" in curator_report
+    assert "quality_retrieval" in curator_report["qrotaid_stages"]
+    assert "deduplication" in curator_report["qrotaid_stages"]
+
+
 def test_pipeline_run_still_works(client, tmp_path):
     r = client.post("/api/pipeline/run", json={
         "source_type": "empty",

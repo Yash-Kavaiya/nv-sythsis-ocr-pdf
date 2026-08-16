@@ -16,11 +16,23 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import storage
+from .evals import rigor
 from .evals.metrics import aggregate
 from .evals.runner import resolve_model_config, run_eval
 from .claw.chat import handle_claw_chat
-from .models import ClawChatRequest, CreateRunRequest, CurateRequest, DesignRequest, EvalRequest, PipelineRequest, StageErrorBody, SynthesizeRequest
-from .pipeline import stages
+from .models import (
+    ClawChatRequest,
+    CompareEvalsRequest,
+    CreateRunRequest,
+    CurateRequest,
+    DesignRequest,
+    EvalRequest,
+    PipelineRequest,
+    QualityGateRequest,
+    StageErrorBody,
+    SynthesizeRequest,
+)
+from .pipeline import providers, stages
 from .pdfgen.compiler import find_latex_engine
 from .pipeline import hf_loader
 from .pipeline.llm import LLMClient
@@ -41,6 +53,7 @@ def health():
         "llm_available": llm.available,
         "llm_model": llm.model if llm.available else None,
         "latex_engine": engine[0] if engine else "fpdf2 fallback",
+        "nemo_providers": providers.status(),
     }
 
 
@@ -109,7 +122,9 @@ def runs_design(run_id: str, req: DesignRequest):
 def runs_synthesize(run_id: str, req: SynthesizeRequest):
     llm = LLMClient()
     try:
-        return stages.run_synthesize(run_id, req.num_docs, req.seed, llm, req.privacy_safe)
+        return stages.run_synthesize(
+            run_id, req.num_docs, req.seed, llm, req.privacy_safe, req.generator
+        )
     except stages.RunNotFoundError:
         raise HTTPException(status_code=404, detail="run not found")
     except stages.StageFailure as exc:
@@ -223,6 +238,50 @@ def eval_get(eval_id: str):
         return storage.load_eval(eval_id)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="eval not found")
+
+
+@app.get("/api/leaderboard")
+def leaderboard():
+    """Rank models by mean fuzzy field accuracy across persisted evals."""
+    rows = []
+    for summary in storage.list_evals():
+        model = summary.get("model_name") or "upload"
+        agg = summary.get("aggregate") or {}
+        docs = agg.get("docs_evaluated", 0)
+        if not docs:
+            continue
+        rows.append({
+            "model_name": model,
+            "eval_id": summary.get("eval_id"),
+            "created_at": summary.get("created_at"),
+            "field_accuracy": agg.get("field_accuracy"),
+            "fuzzy_field_accuracy": agg.get("fuzzy_field_accuracy"),
+            "cer": agg.get("cer"),
+            "wer": agg.get("wer"),
+            "structure_f1": agg.get("structure_f1"),
+            "docs_evaluated": docs,
+        })
+    rows.sort(key=lambda r: (r["fuzzy_field_accuracy"] or 0.0, r["field_accuracy"] or 0.0), reverse=True)
+    return rows
+
+
+@app.post("/api/evals/compare")
+def evals_compare(req: CompareEvalsRequest):
+    try:
+        a = storage.load_eval(req.eval_a)
+        b = storage.load_eval(req.eval_b)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"eval not found: {exc}")
+    return rigor.compare_evals(a, b)
+
+
+@app.post("/api/evals/{eval_id}/gate")
+def eval_gate(eval_id: str, req: QualityGateRequest):
+    try:
+        result = storage.load_eval(eval_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="eval not found")
+    return rigor.quality_gate(result.get("aggregate", {}), req.thresholds)
 
 
 # ---------------------------------------------------------------- static site
