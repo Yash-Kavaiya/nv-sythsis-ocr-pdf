@@ -18,14 +18,16 @@ from fastapi.staticfiles import StaticFiles
 from . import storage
 from .evals.metrics import aggregate
 from .evals.runner import resolve_model_config, run_eval
-from .latex.harness import generate_tex
-from .models import EvalRequest, PipelineRequest
-from .pdfgen.compiler import create_pdf, find_latex_engine, pdf_to_png
-from .pipeline import curator, designer, hf_loader, synthesizer
+from .claw.chat import handle_claw_chat
+from .models import ClawChatRequest, CreateRunRequest, CurateRequest, DesignRequest, EvalRequest, PipelineRequest, StageErrorBody, SynthesizeRequest
+from .pipeline import stages
+from .pdfgen.compiler import find_latex_engine
+from .pipeline import hf_loader
 from .pipeline.llm import LLMClient
 
 app = FastAPI(title="NV Synthetic OCR PDF Studio", version="1.0.0")
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+LEGACY_STATIC = Path(__file__).resolve().parent.parent / "static"
 
 
 # ---------------------------------------------------------------- health
@@ -63,84 +65,57 @@ def sample_preview():
 
 @app.post("/api/pipeline/run")
 def pipeline_run(req: PipelineRequest):
-    llm = LLMClient()
-    stages = []
+    try:
+        return stages.run_pipeline_all(req, LLMClient())
+    except stages.StageFailure as exc:
+        body = StageErrorBody(stage=exc.stage, error=exc.error, hint=exc.hint)
+        return JSONResponse(status_code=exc.http_status, content=body.model_dump())
 
-    # 1. Seed acquisition
-    if req.source_type == "huggingface":
-        if not req.hf_dataset:
-            raise HTTPException(status_code=422, detail="hf_dataset is required for huggingface source")
-        try:
-            seed_records = hf_loader.load_hf_rows(req.hf_dataset, req.hf_config, req.hf_split, limit=50)
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=f"HuggingFace load failed: {exc}")
-        stages.append({"stage": "seed", "detail": {"source": req.hf_dataset, "rows": len(seed_records)}})
-    elif req.source_type == "sample":
-        seed_records = hf_loader.load_sample_seed()
-        stages.append({"stage": "seed", "detail": {"source": "bundled sample corpus", "rows": len(seed_records)}})
-    else:
-        seed_records = []
-        stages.append({"stage": "seed", "detail": {"source": "empty (prompt only)", "rows": 0}})
 
-    # 2. NeMo Curator
-    curated, curator_report = curator.curate(seed_records)
-    stages.append({"stage": "curator", "detail": curator_report})
+# ---------------------------------------------------------------- runs & artifacts
 
-    # 3. NeMo Data Designer
-    stats = curator.seed_stats(curated)
-    schema, design_report = designer.design_schema(req.prompt, stats, llm, req.doc_type)
-    stages.append({"stage": "designer", "detail": design_report})
-
-    # 4. NeMo Synthesizer -> JSON ground truth
-    records, synth_report = synthesizer.synthesize(schema, req.num_docs, llm, req.seed)
-    stages.append({"stage": "synthesizer", "detail": synth_report})
-
-    # 5. LaTeX agent harness + 6. PDF
-    run_id = storage.new_id("run")
-    rdir = storage.run_dir(run_id)
-    rdir.mkdir(parents=True, exist_ok=True)
-
-    docs = []
-    engines = set()
-    for i, record in enumerate(records):
-        (rdir / f"doc_{i}.json").write_text(json.dumps(record, indent=2, default=str))
-        tex, attempts = generate_tex(record, schema, llm)
-        (rdir / f"doc_{i}.tex").write_text(tex)
-        pdf_path = rdir / f"doc_{i}.pdf"
-        engine = create_pdf(tex, schema["doc_type"], record, schema.get("currency", "$"), str(pdf_path))
-        engines.add(engine)
-        png_path = rdir / f"doc_{i}.png"
-        has_png = pdf_to_png(str(pdf_path), str(png_path))
-        docs.append({
-            "index": i,
-            "json_path": f"/api/runs/{run_id}/docs/{i}/json",
-            "tex_path": f"/api/runs/{run_id}/docs/{i}/tex",
-            "pdf_path": f"/api/runs/{run_id}/docs/{i}/pdf",
-            "png_path": f"/api/runs/{run_id}/docs/{i}/png" if has_png else None,
-            "harness_attempts": attempts,
-            "pdf_engine": engine,
-        })
-    stages.append({"stage": "latex_harness", "detail": {
-        "template": f"{schema['doc_type']}.tex.j2",
-        "docs": len(docs),
-        "repair_attempts": sum(d["harness_attempts"] - 1 for d in docs),
-    }})
-    stages.append({"stage": "pdf", "detail": {"engine": ", ".join(sorted(engines)), "docs": len(docs)}})
-
-    manifest = {
-        "run_id": run_id,
-        "created_at": storage.now_iso(),
-        "request": req.model_dump(),
-        "schema": schema,
-        "stages": stages,
-        "docs": docs,
-        "llm_backed": bool(design_report.get("llm_backed") or synth_report.get("llm_backed")),
-    }
+@app.post("/api/runs")
+def runs_create(req: CreateRunRequest):
+    manifest = stages.create_run(req.prompt, req.source_type)
+    manifest["request"] = req.model_dump()
     storage.save_manifest(manifest)
     return manifest
 
 
-# ---------------------------------------------------------------- runs & artifacts
+@app.post("/api/runs/{run_id}/curate")
+def runs_curate(run_id: str, req: CurateRequest):
+    try:
+        return stages.run_curate(run_id, req)
+    except stages.RunNotFoundError:
+        raise HTTPException(status_code=404, detail="run not found")
+    except stages.StageFailure as exc:
+        body = StageErrorBody(stage=exc.stage, error=exc.error, hint=exc.hint)
+        return JSONResponse(status_code=exc.http_status, content=body.model_dump())
+
+
+@app.post("/api/runs/{run_id}/design")
+def runs_design(run_id: str, req: DesignRequest):
+    llm = LLMClient()
+    try:
+        return stages.run_design(run_id, req.prompt, req.doc_type, llm)
+    except stages.RunNotFoundError:
+        raise HTTPException(status_code=404, detail="run not found")
+    except stages.StageFailure as exc:
+        body = StageErrorBody(stage=exc.stage, error=exc.error, hint=exc.hint)
+        return JSONResponse(status_code=exc.http_status, content=body.model_dump())
+
+
+@app.post("/api/runs/{run_id}/synthesize")
+def runs_synthesize(run_id: str, req: SynthesizeRequest):
+    llm = LLMClient()
+    try:
+        return stages.run_synthesize(run_id, req.num_docs, req.seed, llm, req.privacy_safe)
+    except stages.RunNotFoundError:
+        raise HTTPException(status_code=404, detail="run not found")
+    except stages.StageFailure as exc:
+        body = StageErrorBody(stage=exc.stage, error=exc.error, hint=exc.hint)
+        return JSONResponse(status_code=exc.http_status, content=body.model_dump())
+
 
 @app.get("/api/runs")
 def runs_list():
@@ -189,6 +164,17 @@ def doc_artifact(run_id: str, index: int, kind: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="artifact not found")
     return FileResponse(path, media_type=media, filename=path.name)
+
+
+# ---------------------------------------------------------------- claw
+
+@app.post("/api/claw/chat")
+def claw_chat(req: ClawChatRequest):
+    try:
+        storage.load_manifest(req.run_id)
+    except (FileNotFoundError, ValueError):
+        raise HTTPException(status_code=404, detail="run not found")
+    return handle_claw_chat(req.run_id, req.message)
 
 
 # ---------------------------------------------------------------- evals
@@ -241,4 +227,8 @@ def eval_get(eval_id: str):
 
 # ---------------------------------------------------------------- static site
 
-app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+if FRONTEND_DIST.exists():
+    app.mount("/legacy", StaticFiles(directory=str(LEGACY_STATIC), html=True), name="legacy")
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="spa")
+else:
+    app.mount("/", StaticFiles(directory=str(LEGACY_STATIC), html=True), name="static")

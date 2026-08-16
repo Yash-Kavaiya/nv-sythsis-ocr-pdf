@@ -17,44 +17,99 @@ One prompt ──► NVIDIA synthetic data generation
 
 ## Quickstart
 
-One command — installs deps, loads env, starts the server with reload:
+**Recommended** — one command (installs Python deps, builds the React app if
+needed, starts the API):
 
 ```bash
-./run.sh          # macOS/Linux/Git Bash   (PORT=9000 ./run.sh for another port)
-.\run.ps1         # Windows PowerShell
+# Windows
+.\run.ps1
+
+# macOS / Linux
+chmod +x run.sh && ./run.sh
 ```
+
+Open **http://localhost:8000** for the **NeMo wizard** (React SPA). The
+original single-page Studio and Eval Lab remain at **http://localhost:8000/legacy/**.
+
+**Dual-process frontend dev** (hot reload via Vite, API on port 8000):
+
+```bash
+# Windows
+$env:DEV_FRONTEND='1'; .\run.ps1
+
+# macOS / Linux
+DEV_FRONTEND=1 ./run.sh
+```
+
+Then open **http://localhost:5173** — Vite proxies `/api` to the backend.
 
 <details>
 <summary>or do it manually</summary>
 
 ```bash
 pip install -r requirements.txt
+cd frontend && npm install && npm run build && cd ..
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 </details>
 
-Open <http://localhost:8000> — **Studio** (generate documents) and
-<http://localhost:8000/eval.html> — **Eval Lab** (score an OCR model).
+## Wizard UI
 
-Both scripts source a gitignored `.env` if present, so you can keep secrets in
-a file instead of exporting them each session:
+The React app (`frontend/`) walks through five stages for each run:
+
+| Step | Stage | What it does |
+|------|-------|----------------|
+| 1 | **NeMo Curator** | Load seed data (HuggingFace, sample corpus, or empty), run dedup/filter/normalize/PII scrub + web retrieval |
+| 2 | **NeMo Data Designer** | Turn your prompt into a document schema (type, theme, fields, locale) |
+| 3 | **NeMo Safe Synthesizer** | Generate N ground-truth JSON records + LaTeX/PDF/PNG artifacts |
+| 4 | **NeMo Claw** | In-app orchestrator chat — ask what failed, re-run stages, inspect reports (optional; does not block Evaluator) |
+| 5 | **NeMo Evaluator** | Score your OCR model (vision API or uploaded predictions) against ground truth |
+
+Create a run from the header, then advance through the stepper. A **Claw rail**
+appears on the side once a run exists (except on the full Claw page).
+
+## Environment
+
+The `run.ps1` / `run.sh` scripts source a gitignored `.env` if present, so you
+can keep secrets in a file instead of exporting them each session:
 
 ```bash
 echo 'NVIDIA_API_KEY=nvapi-...' > .env
 ```
 
-Everything works fully offline out of the box. Two optional upgrades:
+Everything works fully offline without a key; optional upgrades:
 
 | Env var | Effect |
 |---|---|
 | `NVIDIA_API_KEY` | Enables LLM-backed schema design, themed synthesis and LaTeX repair via [NVIDIA NIM](https://build.nvidia.com) (`integrate.api.nvidia.com`). Without it, a deterministic Faker-based synthesizer runs instead. |
 | `NVIDIA_MODEL` / `NVIDIA_BASE_URL` | Override the default model (`meta/llama-3.1-70b-instruct`) or endpoint. |
 | `DATA_DIR` | Where runs/evals are persisted (default `./data`). |
+| `PORT` | API port for `run.ps1` / `run.sh` (default `8000`). |
+| `DEV_FRONTEND` | Set to `1` to start Vite dev server alongside the API (see Quickstart). |
+
+**Security:** Treat `NVIDIA_API_KEY` like a password. Do not paste keys into
+issues, commits, or chat logs. Rotate the key at
+[build.nvidia.com](https://build.nvidia.com) if it is ever exposed.
 
 If `tectonic` or `pdflatex` is installed, PDFs are compiled from the generated
 `.tex`; otherwise an equivalent pure-Python (fpdf2) renderer produces them.
 
 ## How it works
+
+### Hybrid APIs
+
+You can drive the pipeline two ways:
+
+1. **Wizard (stage-by-stage)** — `POST /api/runs` then
+   `POST /api/runs/{id}/curate`, `/design`, `/synthesize`. Each stage updates
+   `manifest.json` with `stage_status` and persists artifacts under
+   `data/runs/<run_id>/`.
+2. **Run-all (legacy)** — `POST /api/pipeline/run` executes Curator → Designer →
+   Synthesizer → LaTeX → PDF in one request (used by the legacy Studio UI).
+
+**NeMo Claw** — `POST /api/claw/chat` with `{ run_id, message }` returns an
+assistant reply plus optional tool calls (re-run synthesizer, show curator report,
+etc.). Messages are persisted under `data/runs/<run_id>/claw/`.
 
 ### Studio — one prompt in, a dataset out (`POST /api/pipeline/run`)
 
@@ -104,6 +159,11 @@ field-level diff table; evals are persisted and comparable across models.
 GET  /api/health                             LLM + LaTeX engine status
 GET  /api/hf/preview?dataset=…               preview HuggingFace rows
 GET  /api/sample/preview                     preview bundled sample corpus
+POST /api/runs                               create run (wizard entry)
+POST /api/runs/{id}/curate                   run Curator stage
+POST /api/runs/{id}/design                   run Data Designer stage
+POST /api/runs/{id}/synthesize               run Synthesizer stage
+POST /api/claw/chat                          NeMo Claw orchestrator chat
 POST /api/pipeline/run                       run the full generation pipeline
 GET  /api/runs                               list runs
 GET  /api/runs/{id}                          run manifest (stages, schema, docs)
@@ -117,15 +177,17 @@ GET  /api/evals · /api/evals/{id}            list / fetch eval results
 
 ```
 app/
-  main.py               FastAPI app + API routes, serves the static site
+  main.py               FastAPI app + API routes; serves SPA or legacy static
   models.py             request/response schemas
   storage.py            run & eval persistence (filesystem)
   pipeline/
+    stages.py           per-stage runners + manifest status helpers
     hf_loader.py        HuggingFace datasets-server + sample corpus loading
     curator.py          dedup / filter / normalize / PII scrub
     designer.py         prompt → document schema
     synthesizer.py      schema → ground-truth JSON records
     llm.py              OpenAI-compatible client (NVIDIA NIM)
+  claw/                 NeMo Claw chat + tool execution
   latex/
     harness.py          JSON → .tex agent loop (render, validate, repair)
     templates/          invoice / receipt / letter / form Jinja2 LaTeX templates
@@ -135,5 +197,7 @@ app/
   evals/
     metrics.py          CER, WER, field accuracy, structure F1
     runner.py           vision-model calls + scoring
-static/                 the website (Studio + Eval Lab, no build step)
+frontend/               React + Vite wizard (build → dist/, served at /)
+static/                 legacy website (Studio + Eval Lab, served at /legacy/)
+run.ps1 / run.sh        one-command start scripts
 ```

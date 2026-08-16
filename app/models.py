@@ -10,6 +10,39 @@ SourceType = Literal["huggingface", "sample", "empty"]
 DocType = Literal["invoice", "receipt", "letter", "form"]
 
 
+class CreateRunRequest(BaseModel):
+    prompt: str = ""
+    source_type: SourceType = "empty"
+    hf_dataset: Optional[str] = None
+    hf_config: Optional[str] = None
+    hf_split: str = "train"
+
+
+class CurateRequest(BaseModel):
+    source_type: SourceType = "empty"
+    hf_dataset: Optional[str] = None
+    hf_config: Optional[str] = None
+    hf_split: str = "train"
+
+
+class DesignRequest(BaseModel):
+    prompt: str = Field(..., min_length=3)
+    doc_type: Optional[DocType] = None
+
+
+class SynthesizeRequest(BaseModel):
+    num_docs: int = Field(5, ge=1, le=50)
+    seed: Optional[int] = None
+    privacy_safe: bool = True
+
+
+class StageErrorBody(BaseModel):
+    ok: bool = False
+    stage: str
+    error: str
+    hint: str = ""
+
+
 class PipelineRequest(BaseModel):
     source_type: SourceType = "empty"
     hf_dataset: Optional[str] = None
@@ -90,6 +123,11 @@ class DocEval(BaseModel):
     error: Optional[str] = None
     fields: list[dict[str, Any]] = []
     prediction: dict[str, Any] = {}
+
+
+class ClawChatRequest(BaseModel):
+    run_id: str
+    message: str = Field(..., min_length=1)
 
 
 class EvalResult(BaseModel):

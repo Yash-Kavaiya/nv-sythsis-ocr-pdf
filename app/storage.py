@@ -41,6 +41,43 @@ def load_manifest(run_id: str) -> dict[str, Any]:
     return json.loads(path.read_text())
 
 
+def _safe_run_path(run_id: str, relative: str) -> Path:
+    base = run_dir(run_id)
+    path = (base / relative).resolve()
+    if not str(path).startswith(str(base.resolve())):
+        raise ValueError("invalid path")
+    return path
+
+
+def write_run_json(run_id: str, relative: str, data: Any) -> None:
+    path = _safe_run_path(run_id, relative)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, default=str))
+
+
+def read_run_json(run_id: str, relative: str) -> Any:
+    path = _safe_run_path(run_id, relative)
+    if not path.exists():
+        raise FileNotFoundError(relative)
+    return json.loads(path.read_text())
+
+
+_DOWNSTREAM_STALE: dict[str, list[str]] = {
+    "curator": ["designer", "synthesizer"],
+    "designer": ["synthesizer"],
+}
+
+
+def mark_downstream_stale(manifest: dict[str, Any], from_stage: str) -> dict[str, Any]:
+    targets = _DOWNSTREAM_STALE.get(from_stage, [])
+    stage_status = dict(manifest.get("stage_status", {}))
+    for stage in targets:
+        if stage in stage_status:
+            stage_status[stage] = "stale"
+    manifest["stage_status"] = stage_status
+    return manifest
+
+
 def list_runs() -> list[dict[str, Any]]:
     out = []
     if RUNS_DIR.exists():
@@ -69,6 +106,19 @@ def load_eval(eval_id: str) -> dict[str, Any]:
     if not str(path).startswith(str(EVALS_DIR.resolve())) or not path.exists():
         raise FileNotFoundError(eval_id)
     return json.loads(path.read_text())
+
+
+def load_claw_messages(run_id: str) -> list[dict[str, Any]]:
+    path = _safe_run_path(run_id, "claw/messages.json")
+    if not path.exists():
+        return []
+    return json.loads(path.read_text())
+
+
+def save_claw_messages(run_id: str, messages: list[dict[str, Any]]) -> None:
+    path = _safe_run_path(run_id, "claw/messages.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(messages, indent=2, default=str))
 
 
 def list_evals() -> list[dict[str, Any]]:
