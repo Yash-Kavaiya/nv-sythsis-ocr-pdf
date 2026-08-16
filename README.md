@@ -17,13 +17,31 @@ One prompt ──► NVIDIA synthetic data generation
 
 ## Quickstart
 
+One command — installs deps, loads env, starts the server with reload:
+
+```bash
+./run.sh          # macOS/Linux/Git Bash   (PORT=9000 ./run.sh for another port)
+.\run.ps1         # Windows PowerShell
+```
+
+<details>
+<summary>or do it manually</summary>
+
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+</details>
 
 Open <http://localhost:8000> — **Studio** (generate documents) and
 <http://localhost:8000/eval.html> — **Eval Lab** (score an OCR model).
+
+Both scripts source a gitignored `.env` if present, so you can keep secrets in
+a file instead of exporting them each session:
+
+```bash
+echo 'NVIDIA_API_KEY=nvapi-...' > .env
+```
 
 Everything works fully offline out of the box. Two optional upgrades:
 
