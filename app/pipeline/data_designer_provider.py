@@ -178,10 +178,10 @@ def build_builder(schema: dict[str, Any]):
             elif ftype == "digits4":
                 _add_sampler(builder, SamplerColumnConfig, SamplerType, UniformSamplerParams, fname, SamplerType.UNIFORM, {"low": 0, "high": 9999})
             elif ftype == "date":
-                if not _add_sampler(builder, SamplerColumnConfig, SamplerType, DatetimeSamplerParams, fname, SamplerType.DATETIME, {"start": "2024-01-01", "end": "2026-12-31", "unit": "days"}):
+                if not _add_sampler(builder, SamplerColumnConfig, SamplerType, DatetimeSamplerParams, fname, SamplerType.DATETIME, {"start": "2024-01-01", "end": "2026-12-31", "unit": "D"}):
                     _add_text(builder, LLMTextColumnConfig, fname, f"A date between 2024 and 2026, formatted like 12 Mar 2025", schema)
             elif ftype == "dob":
-                if not _add_sampler(builder, SamplerColumnConfig, SamplerType, DatetimeSamplerParams, fname, SamplerType.DATETIME, {"start": "1945-01-01", "end": "2008-12-31", "unit": "days"}):
+                if not _add_sampler(builder, SamplerColumnConfig, SamplerType, DatetimeSamplerParams, fname, SamplerType.DATETIME, {"start": "1945-01-01", "end": "2008-12-31", "unit": "D"}):
                     _add_text(builder, LLMTextColumnConfig, fname, f"A date of birth between 1945 and 2008, formatted like 12 Mar 1980", schema)
             elif ftype == "name":
                 _add_text(builder, LLMTextColumnConfig, fname, "A realistic full person name", schema)
@@ -277,10 +277,17 @@ def _short_id(value: str) -> str:
 def _format_date(value: Any) -> str:
     import datetime as dt
 
-    if isinstance(value, dt.datetime):
-        return value.strftime("%d %b %Y")
-    if isinstance(value, dt.date):
-        return value.strftime("%d %b %Y")
+    try:
+        if hasattr(value, "to_pydatetime"):  # pandas Timestamp
+            value = value.to_pydatetime()
+        elif hasattr(value, "item"):  # numpy.datetime64
+            value = value.item()
+        if isinstance(value, dt.datetime):
+            return value.strftime("%d %b %Y")
+        if isinstance(value, dt.date):
+            return value.strftime("%d %b %Y")
+    except Exception:
+        pass
     text = str(value).strip()
     try:
         return dt.datetime.fromisoformat(text).strftime("%d %b %Y")
@@ -291,8 +298,15 @@ def _format_date(value: Any) -> str:
 def _format_time(value: Any) -> str:
     import datetime as dt
 
-    if isinstance(value, (dt.datetime, dt.time)):
-        return value.strftime("%H:%M")
+    try:
+        if hasattr(value, "to_pydatetime"):
+            value = value.to_pydatetime()
+        elif hasattr(value, "item"):
+            value = value.item()
+        if isinstance(value, (dt.datetime, dt.time)):
+            return value.strftime("%H:%M")
+    except Exception:
+        pass
     text = str(value).strip()
     if re.match(r"^\d{1,2}:\d{2}", text):
         return text[:5]

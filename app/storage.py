@@ -81,7 +81,7 @@ def mark_downstream_stale(manifest: dict[str, Any], from_stage: str) -> dict[str
 def list_runs() -> list[dict[str, Any]]:
     out = []
     if RUNS_DIR.exists():
-        for d in sorted(RUNS_DIR.iterdir(), reverse=True):
+        for d in RUNS_DIR.iterdir():
             mpath = d / "manifest.json"
             if mpath.exists():
                 m = json.loads(mpath.read_text())
@@ -93,6 +93,7 @@ def list_runs() -> list[dict[str, Any]]:
                     "num_docs": len(m.get("docs", [])),
                     "llm_backed": m.get("llm_backed", False),
                 })
+        out.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     return out
 
 
